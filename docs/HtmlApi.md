@@ -76,7 +76,11 @@ Name | Type | Description  | Notes
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 **200** | Success |  -  |
-**405** | Invalid input |  -  |
+**402** | Billing issue, probably you&#39;ve ran out of credits |  -  |
+**403** | Wrong API key |  -  |
+**405** | Invalid input/parameters |  -  |
+**429** | Too many concurrent requsts |  -  |
+**500** | Server error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

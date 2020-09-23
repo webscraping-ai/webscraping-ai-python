@@ -96,7 +96,7 @@ void (empty response body)
 **402** | Billing issue, probably you&#39;ve ran out of credits |  -  |
 **403** | Wrong API key |  -  |
 **422** | Non-2xx and non-404 HTTP status code on the target page |  -  |
-**429** | Too many concurrent requsts |  -  |
+**429** | Too many concurrent requests |  -  |
 **500** | Unexpected error, try again or contact support@webscraping.ai |  -  |
 **504** | Timeout error, try increasing timeout parameter value |  -  |
 **200** | Success |  -  |
@@ -190,7 +190,7 @@ Name | Type | Description  | Notes
 **402** | Billing issue, probably you&#39;ve ran out of credits |  -  |
 **403** | Wrong API key |  -  |
 **422** | Non-2xx and non-404 HTTP status code on the target page |  -  |
-**429** | Too many concurrent requsts |  -  |
+**429** | Too many concurrent requests |  -  |
 **500** | Unexpected error, try again or contact support@webscraping.ai |  -  |
 **504** | Timeout error, try increasing timeout parameter value |  -  |
 **200** | Success |  -  |
@@ -198,7 +198,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **post_selected**
-> post_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy)
+> post_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
 
 HTML of a selected page areas by URL and CSS selector, with POST request to the target page
 
@@ -238,16 +238,17 @@ configuration = webscraping_ai.Configuration(
 with webscraping_ai.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = webscraping_ai.SelectedHTMLApi(api_client)
-    url = 'https://example.com' # str | URL of the target page
+    url = 'https://httpbin.org/post' # str | URL of the target page
 selector = 'h1' # str | CSS selector (null by default, returns whole page HTML) (optional)
 headers = {'key': '{\"Cookie\":\"session=some_id\"}'} # dict(str, str) | HTTP headers to pass to the target page. Can be specified either via a nested query parameter (...&headers[One]=value1&headers=[Another]=value2) or as a JSON encoded object (...&headers={\"One\": \"value1\", \"Another\": \"value2\"}) (optional)
 timeout = 5000 # int | Maximum processing time in ms. Increase it in case of timeout errors (5000 by default, maximum is 30000) (optional) (default to 5000)
 js = True # bool | Execute on-page JavaScript using a headless browser (true by default), costs 2 requests (optional) (default to True)
 proxy = 'datacenter' # str | Type of proxy, use residential proxies if your site restricts traffic from datacenters (datacenter by default) (optional) (default to 'datacenter')
+request_body = None # dict(str, object) | Request body to pass to the target page (optional)
 
     try:
         # HTML of a selected page areas by URL and CSS selector, with POST request to the target page
-        api_instance.post_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy)
+        api_instance.post_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
     except ApiException as e:
         print("Exception when calling SelectedHTMLApi->post_selected: %s\n" % e)
 ```
@@ -262,6 +263,7 @@ Name | Type | Description  | Notes
  **timeout** | **int**| Maximum processing time in ms. Increase it in case of timeout errors (5000 by default, maximum is 30000) | [optional] [default to 5000]
  **js** | **bool**| Execute on-page JavaScript using a headless browser (true by default), costs 2 requests | [optional] [default to True]
  **proxy** | **str**| Type of proxy, use residential proxies if your site restricts traffic from datacenters (datacenter by default) | [optional] [default to &#39;datacenter&#39;]
+ **request_body** | [**dict(str, object)**](object.md)| Request body to pass to the target page | [optional] 
 
 ### Return type
 
@@ -273,7 +275,7 @@ void (empty response body)
 
 ### HTTP request headers
 
- - **Content-Type**: Not defined
+ - **Content-Type**: application/json, application/x-www-form-urlencoded, application/xml, text/plain
  - **Accept**: application/json, text/html
 
 ### HTTP response details
@@ -283,7 +285,7 @@ void (empty response body)
 **402** | Billing issue, probably you&#39;ve ran out of credits |  -  |
 **403** | Wrong API key |  -  |
 **422** | Non-2xx and non-404 HTTP status code on the target page |  -  |
-**429** | Too many concurrent requsts |  -  |
+**429** | Too many concurrent requests |  -  |
 **500** | Unexpected error, try again or contact support@webscraping.ai |  -  |
 **504** | Timeout error, try increasing timeout parameter value |  -  |
 **200** | Success |  -  |
@@ -291,7 +293,7 @@ void (empty response body)
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **post_selected_multiple**
-> list[str] post_selected_multiple(url, selectors=selectors, headers=headers, timeout=timeout, js=js, proxy=proxy)
+> list[str] post_selected_multiple(url, selectors=selectors, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
 
 HTML of multiple page areas by URL and CSS selectors, with POST request to the target page
 
@@ -331,16 +333,17 @@ configuration = webscraping_ai.Configuration(
 with webscraping_ai.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = webscraping_ai.SelectedHTMLApi(api_client)
-    url = 'https://example.com' # str | URL of the target page
+    url = 'https://httpbin.org/post' # str | URL of the target page
 selectors = ['[\"h1\"]'] # list[str] | Multiple CSS selectors (null by default, returns whole page HTML) (optional)
 headers = {'key': '{\"Cookie\":\"session=some_id\"}'} # dict(str, str) | HTTP headers to pass to the target page. Can be specified either via a nested query parameter (...&headers[One]=value1&headers=[Another]=value2) or as a JSON encoded object (...&headers={\"One\": \"value1\", \"Another\": \"value2\"}) (optional)
 timeout = 5000 # int | Maximum processing time in ms. Increase it in case of timeout errors (5000 by default, maximum is 30000) (optional) (default to 5000)
 js = True # bool | Execute on-page JavaScript using a headless browser (true by default), costs 2 requests (optional) (default to True)
 proxy = 'datacenter' # str | Type of proxy, use residential proxies if your site restricts traffic from datacenters (datacenter by default) (optional) (default to 'datacenter')
+request_body = None # dict(str, object) | Request body to pass to the target page (optional)
 
     try:
         # HTML of multiple page areas by URL and CSS selectors, with POST request to the target page
-        api_response = api_instance.post_selected_multiple(url, selectors=selectors, headers=headers, timeout=timeout, js=js, proxy=proxy)
+        api_response = api_instance.post_selected_multiple(url, selectors=selectors, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
         pprint(api_response)
     except ApiException as e:
         print("Exception when calling SelectedHTMLApi->post_selected_multiple: %s\n" % e)
@@ -356,6 +359,7 @@ Name | Type | Description  | Notes
  **timeout** | **int**| Maximum processing time in ms. Increase it in case of timeout errors (5000 by default, maximum is 30000) | [optional] [default to 5000]
  **js** | **bool**| Execute on-page JavaScript using a headless browser (true by default), costs 2 requests | [optional] [default to True]
  **proxy** | **str**| Type of proxy, use residential proxies if your site restricts traffic from datacenters (datacenter by default) | [optional] [default to &#39;datacenter&#39;]
+ **request_body** | [**dict(str, object)**](object.md)| Request body to pass to the target page | [optional] 
 
 ### Return type
 
@@ -367,7 +371,7 @@ Name | Type | Description  | Notes
 
 ### HTTP request headers
 
- - **Content-Type**: Not defined
+ - **Content-Type**: application/json, application/x-www-form-urlencoded, application/xml, text/plain
  - **Accept**: application/json
 
 ### HTTP response details
@@ -377,7 +381,7 @@ Name | Type | Description  | Notes
 **402** | Billing issue, probably you&#39;ve ran out of credits |  -  |
 **403** | Wrong API key |  -  |
 **422** | Non-2xx and non-404 HTTP status code on the target page |  -  |
-**429** | Too many concurrent requsts |  -  |
+**429** | Too many concurrent requests |  -  |
 **500** | Unexpected error, try again or contact support@webscraping.ai |  -  |
 **504** | Timeout error, try increasing timeout parameter value |  -  |
 **200** | Success |  -  |

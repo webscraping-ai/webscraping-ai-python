@@ -11,7 +11,7 @@ Method | HTTP request | Description
 
 
 # **get_selected**
-> get_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy)
+> str get_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy)
 
 HTML of a selected page area by URL and CSS selector
 
@@ -60,7 +60,8 @@ proxy = 'datacenter' # str | Type of proxy, use residential proxies if your site
 
     try:
         # HTML of a selected page area by URL and CSS selector
-        api_instance.get_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy)
+        api_response = api_instance.get_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy)
+        pprint(api_response)
     except ApiException as e:
         print("Exception when calling SelectedHTMLApi->get_selected: %s\n" % e)
 ```
@@ -78,7 +79,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-void (empty response body)
+**str**
 
 ### Authorization
 
@@ -198,7 +199,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **post_selected**
-> post_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
+> str post_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
 
 HTML of a selected page areas by URL and CSS selector, with POST request to the target page
 
@@ -248,7 +249,8 @@ request_body = None # dict(str, object) | Request body to pass to the target pag
 
     try:
         # HTML of a selected page areas by URL and CSS selector, with POST request to the target page
-        api_instance.post_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
+        api_response = api_instance.post_selected(url, selector=selector, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
+        pprint(api_response)
     except ApiException as e:
         print("Exception when calling SelectedHTMLApi->post_selected: %s\n" % e)
 ```
@@ -267,7 +269,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-void (empty response body)
+**str**
 
 ### Authorization
 

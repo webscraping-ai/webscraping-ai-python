@@ -9,7 +9,7 @@ Method | HTTP request | Description
 
 
 # **get_html**
-> get_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy)
+> str get_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy)
 
 Page HTML by URL
 
@@ -57,7 +57,8 @@ proxy = 'datacenter' # str | Type of proxy, use residential proxies if your site
 
     try:
         # Page HTML by URL
-        api_instance.get_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy)
+        api_response = api_instance.get_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy)
+        pprint(api_response)
     except ApiException as e:
         print("Exception when calling HTMLApi->get_html: %s\n" % e)
 ```
@@ -74,7 +75,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-void (empty response body)
+**str**
 
 ### Authorization
 
@@ -100,7 +101,7 @@ void (empty response body)
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **post_html**
-> post_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
+> str post_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
 
 Page HTML by URL with POST request to the target page
 
@@ -149,7 +150,8 @@ request_body = None # dict(str, object) | Request body to pass to the target pag
 
     try:
         # Page HTML by URL with POST request to the target page
-        api_instance.post_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
+        api_response = api_instance.post_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy, request_body=request_body)
+        pprint(api_response)
     except ApiException as e:
         print("Exception when calling HTMLApi->post_html: %s\n" % e)
 ```
@@ -167,7 +169,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-void (empty response body)
+**str**
 
 ### Authorization
 

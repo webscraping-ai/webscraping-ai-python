@@ -87,7 +87,8 @@ proxy = 'datacenter' # str | Type of proxy, use residential proxies if your site
 
     try:
         # Page HTML by URL
-        api_instance.get_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy)
+        api_response = api_instance.get_html(url, headers=headers, timeout=timeout, js=js, proxy=proxy)
+        pprint(api_response)
     except ApiException as e:
         print("Exception when calling HTMLApi->get_html: %s\n" % e)
     

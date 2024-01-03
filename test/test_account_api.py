@@ -15,29 +15,22 @@
 
 import unittest
 
-from webscraping_ai.api.selected_html_api import SelectedHTMLApi
+from webscraping_ai.api.account_api import AccountApi
 
 
-class TestSelectedHTMLApi(unittest.TestCase):
-    """SelectedHTMLApi unit test stubs"""
+class TestAccountApi(unittest.TestCase):
+    """AccountApi unit test stubs"""
 
     def setUp(self) -> None:
-        self.api = SelectedHTMLApi()
+        self.api = AccountApi()
 
     def tearDown(self) -> None:
         pass
 
-    def test_get_selected(self) -> None:
-        """Test case for get_selected
+    def test_account(self) -> None:
+        """Test case for account
 
-        HTML of a selected page area by URL and CSS selector
-        """
-        pass
-
-    def test_get_selected_multiple(self) -> None:
-        """Test case for get_selected_multiple
-
-        HTML of multiple page areas by URL and CSS selectors
+        Information about your account calls quota
         """
         pass
 

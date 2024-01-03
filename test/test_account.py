@@ -16,10 +16,10 @@
 import unittest
 import datetime
 
-from webscraping_ai.models.error import Error
+from webscraping_ai.models.account import Account
 
-class TestError(unittest.TestCase):
-    """Error unit test stubs"""
+class TestAccount(unittest.TestCase):
+    """Account unit test stubs"""
 
     def setUp(self):
         pass
@@ -27,28 +27,27 @@ class TestError(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def make_instance(self, include_optional) -> Error:
-        """Test Error
+    def make_instance(self, include_optional) -> Account:
+        """Test Account
             include_option is a boolean, when False only required
             params are included, when True both required and
             optional params are included """
-        # uncomment below to create an instance of `Error`
+        # uncomment below to create an instance of `Account`
         """
-        model = Error()
+        model = Account()
         if include_optional:
-            return Error(
-                message = '',
-                status_code = 56,
-                status_message = '',
-                body = ''
+            return Account(
+                remaining_api_calls = 56,
+                resets_at = 56,
+                remaining_concurrency = 56
             )
         else:
-            return Error(
+            return Account(
         )
         """
 
-    def testError(self):
-        """Test Error"""
+    def testAccount(self):
+        """Test Account"""
         # inst_req_only = self.make_instance(include_optional=False)
         # inst_req_and_optional = self.make_instance(include_optional=True)
 

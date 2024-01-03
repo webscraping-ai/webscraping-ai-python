@@ -15,29 +15,22 @@
 
 import unittest
 
-from webscraping_ai.api.selected_html_api import SelectedHTMLApi
+from webscraping_ai.api.text_api import TextApi
 
 
-class TestSelectedHTMLApi(unittest.TestCase):
-    """SelectedHTMLApi unit test stubs"""
+class TestTextApi(unittest.TestCase):
+    """TextApi unit test stubs"""
 
     def setUp(self) -> None:
-        self.api = SelectedHTMLApi()
+        self.api = TextApi()
 
     def tearDown(self) -> None:
         pass
 
-    def test_get_selected(self) -> None:
-        """Test case for get_selected
+    def test_get_text(self) -> None:
+        """Test case for get_text
 
-        HTML of a selected page area by URL and CSS selector
-        """
-        pass
-
-    def test_get_selected_multiple(self) -> None:
-        """Test case for get_selected_multiple
-
-        HTML of multiple page areas by URL and CSS selectors
+        Page text by URL
         """
         pass
 

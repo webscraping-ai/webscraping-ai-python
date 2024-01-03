@@ -20,22 +20,21 @@ import json
 
 
 from typing import Any, ClassVar, Dict, List, Optional
-from pydantic import BaseModel, StrictInt, StrictStr
+from pydantic import BaseModel, StrictInt
 from pydantic import Field
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
 
-class Error(BaseModel):
+class Account(BaseModel):
     """
-    Error
+    Account
     """ # noqa: E501
-    message: Optional[StrictStr] = Field(default=None, description="Error description")
-    status_code: Optional[StrictInt] = Field(default=None, description="Target page response HTTP status code (403, 500, etc)")
-    status_message: Optional[StrictStr] = Field(default=None, description="Target page response HTTP status message")
-    body: Optional[StrictStr] = Field(default=None, description="Target page response body")
-    __properties: ClassVar[List[str]] = ["message", "status_code", "status_message", "body"]
+    remaining_api_calls: Optional[StrictInt] = Field(default=None, description="Remaining API credits quota")
+    resets_at: Optional[StrictInt] = Field(default=None, description="Next billing cycle start time (UNIX timestamp)")
+    remaining_concurrency: Optional[StrictInt] = Field(default=None, description="Remaining concurrent requests")
+    __properties: ClassVar[List[str]] = ["remaining_api_calls", "resets_at", "remaining_concurrency"]
 
     model_config = {
         "populate_by_name": True,
@@ -55,7 +54,7 @@ class Error(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Self:
-        """Create an instance of Error from a JSON string"""
+        """Create an instance of Account from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -78,7 +77,7 @@ class Error(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Dict) -> Self:
-        """Create an instance of Error from a dict"""
+        """Create an instance of Account from a dict"""
         if obj is None:
             return None
 
@@ -86,10 +85,9 @@ class Error(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "message": obj.get("message"),
-            "status_code": obj.get("status_code"),
-            "status_message": obj.get("status_message"),
-            "body": obj.get("body")
+            "remaining_api_calls": obj.get("remaining_api_calls"),
+            "resets_at": obj.get("resets_at"),
+            "remaining_concurrency": obj.get("remaining_concurrency")
         })
         return _obj
 

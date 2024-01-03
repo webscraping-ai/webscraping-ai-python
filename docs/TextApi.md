@@ -1,18 +1,18 @@
-# webscraping_ai.HTMLApi
+# webscraping_ai.TextApi
 
 All URIs are relative to *https://api.webscraping.ai*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**get_html**](HTMLApi.md#get_html) | **GET** /html | Page HTML by URL
+[**get_text**](TextApi.md#get_text) | **GET** /text | Page text by URL
 
 
-# **get_html**
-> str get_html(url, headers=headers, timeout=timeout, js=js, js_timeout=js_timeout, proxy=proxy, country=country, device=device, error_on_404=error_on_404, error_on_redirect=error_on_redirect, js_script=js_script, return_script_result=return_script_result)
+# **get_text**
+> str get_text(url, text_format=text_format, return_links=return_links, headers=headers, timeout=timeout, js=js, js_timeout=js_timeout, proxy=proxy, country=country, device=device, error_on_404=error_on_404, error_on_redirect=error_on_redirect, js_script=js_script)
 
-Page HTML by URL
+Page text by URL
 
-Returns the full HTML content of a webpage specified by the URL. The response is in plain text. Proxies and Chromium JavaScript rendering are used for page retrieval and processing.
+Returns the visible text content of a webpage specified by the URL. Can be used to feed data to GPT or other LLM models. The response can be in plain text, JSON, or XML format based on the text_format parameter. Proxies and Chromium JavaScript rendering are used for page retrieval and processing. Returns JSON on error.
 
 ### Example
 
@@ -45,8 +45,10 @@ configuration.api_key['api_key'] = os.environ["API_KEY"]
 # Enter a context with an instance of the API client
 with webscraping_ai.ApiClient(configuration) as api_client:
     # Create an instance of the API class
-    api_instance = webscraping_ai.HTMLApi(api_client)
+    api_instance = webscraping_ai.TextApi(api_client)
     url = 'https://example.com' # str | URL of the target page.
+    text_format = 'plain' # str | Format of the text response (plain by default). \"plain\" will return only the page body text. \"json\" and \"xml\" will return a json/xml with \"title\", \"description\" and \"content\" keys. (optional) (default to 'plain')
+    return_links = False # bool | [Works only with text_format=json] Return links from the page body text (false by default). Useful for building web crawlers. (optional) (default to False)
     headers = {'key': '{\"Cookie\":\"session=some_id\"}'} # Dict[str, str] | HTTP headers to pass to the target page. Can be specified either via a nested query parameter (...&headers[One]=value1&headers=[Another]=value2) or as a JSON encoded object (...&headers={\"One\": \"value1\", \"Another\": \"value2\"}). (optional)
     timeout = 10000 # int | Maximum web page retrieval time in ms. Increase it in case of timeout errors (10000 by default, maximum is 30000). (optional) (default to 10000)
     js = True # bool | Execute on-page JavaScript using a headless browser (true by default). (optional) (default to True)
@@ -57,15 +59,14 @@ with webscraping_ai.ApiClient(configuration) as api_client:
     error_on_404 = False # bool | Return error on 404 HTTP status on the target page (false by default). (optional) (default to False)
     error_on_redirect = False # bool | Return error on redirect on the target page (false by default). (optional) (default to False)
     js_script = 'document.querySelector('button').click();' # str | Custom JavaScript code to execute on the target page. (optional)
-    return_script_result = False # bool | Return result of the custom JavaScript code (js_script parameter) execution on the target page (false by default, page HTML will be returned). (optional) (default to False)
 
     try:
-        # Page HTML by URL
-        api_response = api_instance.get_html(url, headers=headers, timeout=timeout, js=js, js_timeout=js_timeout, proxy=proxy, country=country, device=device, error_on_404=error_on_404, error_on_redirect=error_on_redirect, js_script=js_script, return_script_result=return_script_result)
-        print("The response of HTMLApi->get_html:\n")
+        # Page text by URL
+        api_response = api_instance.get_text(url, text_format=text_format, return_links=return_links, headers=headers, timeout=timeout, js=js, js_timeout=js_timeout, proxy=proxy, country=country, device=device, error_on_404=error_on_404, error_on_redirect=error_on_redirect, js_script=js_script)
+        print("The response of TextApi->get_text:\n")
         pprint(api_response)
     except Exception as e:
-        print("Exception when calling HTMLApi->get_html: %s\n" % e)
+        print("Exception when calling TextApi->get_text: %s\n" % e)
 ```
 
 
@@ -76,6 +77,8 @@ with webscraping_ai.ApiClient(configuration) as api_client:
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **url** | **str**| URL of the target page. | 
+ **text_format** | **str**| Format of the text response (plain by default). \&quot;plain\&quot; will return only the page body text. \&quot;json\&quot; and \&quot;xml\&quot; will return a json/xml with \&quot;title\&quot;, \&quot;description\&quot; and \&quot;content\&quot; keys. | [optional] [default to &#39;plain&#39;]
+ **return_links** | **bool**| [Works only with text_format&#x3D;json] Return links from the page body text (false by default). Useful for building web crawlers. | [optional] [default to False]
  **headers** | [**Dict[str, str]**](str.md)| HTTP headers to pass to the target page. Can be specified either via a nested query parameter (...&amp;headers[One]&#x3D;value1&amp;headers&#x3D;[Another]&#x3D;value2) or as a JSON encoded object (...&amp;headers&#x3D;{\&quot;One\&quot;: \&quot;value1\&quot;, \&quot;Another\&quot;: \&quot;value2\&quot;}). | [optional] 
  **timeout** | **int**| Maximum web page retrieval time in ms. Increase it in case of timeout errors (10000 by default, maximum is 30000). | [optional] [default to 10000]
  **js** | **bool**| Execute on-page JavaScript using a headless browser (true by default). | [optional] [default to True]
@@ -86,7 +89,6 @@ Name | Type | Description  | Notes
  **error_on_404** | **bool**| Return error on 404 HTTP status on the target page (false by default). | [optional] [default to False]
  **error_on_redirect** | **bool**| Return error on redirect on the target page (false by default). | [optional] [default to False]
  **js_script** | **str**| Custom JavaScript code to execute on the target page. | [optional] 
- **return_script_result** | **bool**| Return result of the custom JavaScript code (js_script parameter) execution on the target page (false by default, page HTML will be returned). | [optional] [default to False]
 
 ### Return type
 
@@ -99,7 +101,7 @@ Name | Type | Description  | Notes
 ### HTTP request headers
 
  - **Content-Type**: Not defined
- - **Accept**: application/json, text/html
+ - **Accept**: application/json, text/html, text/xml
 
 ### HTTP response details
 

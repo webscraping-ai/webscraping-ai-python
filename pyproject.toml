@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "webscraping_ai"
-version = "3.1.2"
+version = "3.1.3"
 description = "WebScraping.AI"
 authors = ["WebScraping.AI Support <support@webscraping.ai>"]
 license = "NoLicense"

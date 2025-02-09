@@ -19,8 +19,6 @@ Returns information about your account, including the remaining API credits quot
 * Api Key Authentication (api_key):
 
 ```python
-import time
-import os
 import webscraping_ai
 from webscraping_ai.models.account import Account
 from webscraping_ai.rest import ApiException
@@ -80,7 +78,7 @@ This endpoint does not need any parameter.
 
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-**403** |  |  -  |
+**403** | Wrong API key |  -  |
 **200** | Success |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

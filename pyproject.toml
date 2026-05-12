@@ -1,6 +1,6 @@
 [project]
 name = "webscraping_ai"
-version = "3.2.0"
+version = "3.2.1"
 description = "WebScraping.AI"
 authors = [
   {name = "WebScraping.AI Support",email = "support@webscraping.ai"},

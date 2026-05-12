@@ -1,94 +1,100 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "webscraping_ai"
-version = "3.2.1"
-description = "WebScraping.AI"
-authors = [
-  {name = "WebScraping.AI Support",email = "support@webscraping.ai"},
-]
+dynamic = ["version"]
+description = "Official Python client for the WebScraping.AI API."
 readme = "README.md"
-keywords = ["OpenAPI", "OpenAPI-Generator", "WebScraping.AI"]
 requires-python = ">=3.9"
-
+license = { file = "LICENSE" }
+authors = [{ name = "WebScraping.AI Support", email = "support@webscraping.ai" }]
+keywords = ["webscraping", "scraping", "api", "llm", "crawler"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: WWW/HTTP",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
 dependencies = [
-  "urllib3 (>=2.1.0,<3.0.0)",
-  "python-dateutil (>=2.8.2)",
-  "pydantic (>=2.11)",
-  "typing-extensions (>=4.7.1)",
+  "httpx>=0.27,<1.0",
 ]
 
 [project.urls]
-Repository = "https://github.com/webscraping-ai/webscraping-ai-python"
+Homepage = "https://webscraping.ai"
+Documentation = "https://webscraping.ai/docs"
+Source = "https://github.com/webscraping-ai/webscraping-ai-python"
+Changelog = "https://github.com/webscraping-ai/webscraping-ai-python/blob/master/CHANGELOG.md"
+Issues = "https://github.com/webscraping-ai/webscraping-ai-python/issues"
 
-[tool.poetry]
-requires-poetry = ">=2.0"
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "respx>=0.21",
+  "ruff>=0.6",
+  "mypy>=1.10",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = ">= 7.2.1"
-pytest-cov = ">= 2.8.1"
-tox = ">= 3.9.0"
-flake8 = ">= 4.0.0"
-types-python-dateutil = ">= 2.8.19.14"
-mypy = ">= 1.5"
+[tool.hatch.version]
+path = "src/webscraping_ai/_version.py"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/webscraping_ai"]
 
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/README.md",
+  "/CHANGELOG.md",
+  "/LICENSE",
+  "/pyproject.toml",
+]
 
-[tool.pylint.'MESSAGES CONTROL']
-extension-pkg-whitelist = "pydantic"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",   # pyflakes/pycodestyle
+  "I",             # isort
+  "UP",            # pyupgrade
+  "B",             # bugbear
+  "C4",            # comprehensions
+  "SIM",           # simplify
+  "RUF",           # ruff-specific
+]
+ignore = [
+  "UP006", "UP007", "UP035",  # keep typing.List/Dict/Optional for 3.9 compat without `from __future__`
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
 
 [tool.mypy]
-files = [
-  "webscraping_ai",
-  #"test",  # auto-generated tests
-  "tests", # hand-written tests
-]
-# TODO: enable "strict" once all these individual checks are passing
-# strict = true
-
-# List from: https://mypy.readthedocs.io/en/stable/existing_code.html#introduce-stricter-options
-warn_unused_configs = true
+# 3.10 is the lowest version recent mypy supports as a target; runtime support
+# is still 3.9+ (ruff's target-version=py39 guards against 3.10-only syntax).
+python_version = "3.10"
+strict = true
+files = ["src/webscraping_ai"]
+warn_unused_ignores = true
 warn_redundant_casts = true
-warn_unused_ignores = true
-
-## Getting these passing should be easy
-strict_equality = true
-extra_checks = true
-
-## Strongly recommend enabling this one as soon as you can
-check_untyped_defs = true
-
-## These shouldn't be too much additional work, but may be tricky to
-## get passing if you use a lot of untyped libraries
-disallow_subclassing_any = true
-disallow_untyped_decorators = true
-disallow_any_generics = true
-
-### These next few are various gradations of forcing use of type annotations
-#disallow_untyped_calls = true
-#disallow_incomplete_defs = true
-#disallow_untyped_defs = true
-#
-### This one isn't too hard to get passing, but return on investment is lower
-#no_implicit_reexport = true
-#
-### This one can be tricky to get passing if you use a lot of untyped libraries
-#warn_return_any = true
-
-[[tool.mypy.overrides]]
-module = [
-  "webscraping_ai.configuration",
-]
-warn_unused_ignores = true
-strict_equality = true
-extra_checks = true
-check_untyped_defs = true
-disallow_subclassing_any = true
-disallow_untyped_decorators = true
-disallow_any_generics = true
-disallow_untyped_calls = true
-disallow_incomplete_defs = true
-disallow_untyped_defs = true
-no_implicit_reexport = true
 warn_return_any = true
+no_implicit_reexport = false

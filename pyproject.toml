@@ -37,7 +37,7 @@ Source = "https://github.com/webscraping-ai/webscraping-ai-python"
 Changelog = "https://github.com/webscraping-ai/webscraping-ai-python/blob/master/CHANGELOG.md"
 Issues = "https://github.com/webscraping-ai/webscraping-ai-python/issues"
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.23",

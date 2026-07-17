@@ -1,6 +1,14 @@
 # webscraping_ai
 
-Official Python client for the [WebScraping.AI](https://webscraping.ai) API.
+[![PyPI](https://img.shields.io/pypi/v/webscraping_ai.svg)](https://pypi.org/project/webscraping_ai/)
+[![CI](https://github.com/webscraping-ai/webscraping-ai-python/actions/workflows/ci.yml/badge.svg)](https://github.com/webscraping-ai/webscraping-ai-python/actions/workflows/ci.yml)
+
+Official Python client for the [WebScraping.AI](https://webscraping.ai) API —
+web scraping with Chromium JavaScript rendering, rotating
+datacenter/residential/stealth proxies, and AI-powered question answering and
+structured field extraction on any page. Sync and async clients included. See
+the [API documentation](https://webscraping.ai/docs) for the full parameter
+reference.
 
 > **4.0 is a hard break from 3.x.** See [CHANGELOG.md](CHANGELOG.md) for the
 > migration notes. If you cannot update your call sites yet, stay on
@@ -15,6 +23,10 @@ pip install webscraping_ai
 Requires Python 3.9 or newer.
 
 ## Quick start
+
+[Sign up](https://webscraping.ai/auth/sign_up) to get an API key — the free
+trial includes 2,000 credits, no credit card required. Your key lives in the
+[dashboard](https://webscraping.ai/dashboard).
 
 ```python
 from webscraping_ai import Client
@@ -142,6 +154,14 @@ pytest
 ruff check .
 mypy src/webscraping_ai
 ```
+
+## Links
+
+- [WebScraping.AI](https://webscraping.ai) — features, pricing, signup
+- [API documentation](https://webscraping.ai/docs)
+- [Dashboard](https://webscraping.ai/dashboard) — API key, usage, request builder
+- Other official clients: [JavaScript](https://github.com/webscraping-ai/webscraping-ai-js) · [Ruby](https://github.com/webscraping-ai/webscraping-ai-ruby) · [PHP](https://github.com/webscraping-ai/webscraping-ai-php) · [Go](https://github.com/webscraping-ai/webscraping-ai-go) · [Java](https://github.com/webscraping-ai/webscraping-ai-java) · [.NET](https://github.com/webscraping-ai/webscraping-ai-dotnet) · [CLI](https://github.com/webscraping-ai/webscraping-ai-cli) · [MCP server](https://github.com/webscraping-ai/webscraping-ai-mcp-server) · [n8n node](https://github.com/webscraping-ai/webscraping-ai-n8n)
+- Support: [support@webscraping.ai](mailto:support@webscraping.ai)
 
 ## License
 

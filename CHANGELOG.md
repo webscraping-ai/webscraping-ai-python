@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.1 — 2026-07-17
+
+### Changed
+
+- Documentation: expanded README — API docs, signup/dashboard links, badges, and links to the other official clients.
+
 ## 4.0.0 — unreleased
 
 Complete rewrite of the official Python client. The previous 3.x releases were

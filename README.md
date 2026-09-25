@@ -190,6 +190,19 @@ ruff check .
 mypy src/webscraping_ai
 ```
 
+## Smoke testing
+
+`bin/smoke.py` hits every endpoint once against the live API through the sync `Client`, plus one
+`account` call through `AsyncClient`. It puts `src/` first on `sys.path`, so it always tests the
+working tree (you still need the runtime deps, e.g. from `pip install -e ".[dev]"`). It is not
+part of the pytest suite and costs ~32 credits per run (the SERP call alone is 15).
+
+```bash
+WEBSCRAPING_AI_API_KEY=... python bin/smoke.py
+```
+
+Each call prints an `ok` or `FAIL` line; the script exits non-zero if any call fails.
+
 ## Links
 
 - [WebScraping.AI](https://webscraping.ai) — features, pricing, signup

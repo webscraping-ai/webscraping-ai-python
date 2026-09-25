@@ -11,6 +11,7 @@ from webscraping_ai import (
     APITimeoutError,
     AsyncClient,
     AuthenticationError,
+    BadRequestError,
     Client,
     RateLimitError,
     ServerError,
@@ -197,5 +198,106 @@ async def test_async_transport_errors_do_not_leak_api_key(httpx_error, expected)
     assert SECRET_KEY not in str(err)
     assert SECRET_KEY not in repr(err)
     assert SECRET_KEY not in formatted
+    assert err.__cause__ is None
+    assert err.__context__ is None
+
+
+VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+JSON = {"content-type": "application/json"}
+
+
+@respx.mock
+async def test_async_data_passes_query_params_and_returns_json():
+    body = {
+        "request_parameters": {"url": VIDEO_URL, "provider": "youtube", "type": "video"},
+        "parse_status": "ok",
+        "data": {"title": "Never Gonna Give You Up"},
+    }
+    route = respx.get(f"{BASE}/data").mock(
+        return_value=httpx.Response(200, json=body, headers=JSON)
+    )
+    async with AsyncClient(api_key=API_KEY) as c:
+        out = await c.data(VIDEO_URL, country="gb", transcript=True, comments="a&b=c")
+    assert out == body
+    params = route.calls.last.request.url.params
+    assert params["url"] == VIDEO_URL
+    assert params["country"] == "gb"
+    assert params["transcript"] == "true"
+    assert params["comments"] == "a&b=c"
+    assert "transcript_language" not in params
+
+
+@respx.mock
+async def test_async_data_sends_unknown_site_url_unmodified():
+    odd = "  https://Example.COM/A%2Fb/\u00fcn\u00ef?x=1&y=a b#Frag  "
+    route = respx.get(f"{BASE}/data").mock(
+        return_value=httpx.Response(200, json={"parse_status": "ok", "data": None}, headers=JSON)
+    )
+    async with AsyncClient(api_key=API_KEY) as c:
+        await c.data(odd)
+    assert route.calls.last.request.url.params["url"] == odd
+
+
+@pytest.mark.parametrize("url", ["", "  ", None, 123])
+@respx.mock
+async def test_async_data_rejects_blank_or_non_str_url(url):
+    route = respx.get(f"{BASE}/data")
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(ValueError, match="url"):
+            await c.data(url)
+    assert not route.called
+
+
+@respx.mock
+async def test_async_data_rejects_api_key_extra_param():
+    route = respx.get(f"{BASE}/data")
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(ValueError, match="api_key"):
+            await c.data(VIDEO_URL, api_key="other")
+    assert not route.called
+
+
+@respx.mock
+async def test_async_data_round_trips_unknown_provider_and_null_data():
+    body = {
+        "request_parameters": {"url": VIDEO_URL, "provider": "newsite", "type": "thing"},
+        "parse_status": "parse_failed",
+        "data": None,
+    }
+    respx.get(f"{BASE}/data").mock(return_value=httpx.Response(200, json=body, headers=JSON))
+    async with AsyncClient(api_key=API_KEY) as c:
+        out = await c.data(VIDEO_URL)
+    assert out["request_parameters"]["provider"] == "newsite"
+    assert out["parse_status"] == "parse_failed"
+    assert out["data"] is None
+
+
+@respx.mock
+async def test_async_data_400_maps_to_bad_request_error():
+    respx.get(f"{BASE}/data").mock(
+        return_value=httpx.Response(
+            400, json={"message": "Unsupported URL for /data."}, headers=JSON
+        )
+    )
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(BadRequestError) as exc_info:
+            await c.data("https://example.com/")
+    assert exc_info.value.status == 400
+    assert exc_info.value.message == "Unsupported URL for /data."
+
+
+@respx.mock
+async def test_async_data_transport_error_does_not_leak_api_key():
+    def raise_with_url(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(f"failed for {request.url}", request=request)
+
+    respx.get(f"{BASE}/data").mock(side_effect=raise_with_url)
+    async with AsyncClient(api_key=SECRET_KEY) as c:
+        with pytest.raises(APIConnectionError) as exc_info:
+            await c.data(VIDEO_URL)
+    err = exc_info.value
+    formatted = "".join(traceback.format_exception(type(err), err, err.__traceback__))
+    assert SECRET_KEY not in formatted
+    assert SECRET_KEY not in repr(err)
     assert err.__cause__ is None
     assert err.__context__ is None

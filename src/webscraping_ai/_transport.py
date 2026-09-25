@@ -6,7 +6,7 @@ identical results for the same API response.
 """
 
 import json
-from typing import Any, Mapping, MutableMapping, Optional
+from typing import Any, Dict, Mapping, MutableMapping, Optional
 
 import httpx
 
@@ -113,3 +113,52 @@ def validate_serp_args(q: Any, page: Any) -> None:
         raise ValueError("q is required")
     if page is not None and (isinstance(page, bool) or not isinstance(page, int) or page < 1):
         raise ValueError(f"page must be an int >= 1, got {page!r}")
+
+
+_DATA_RESERVED_PARAMS = frozenset({"api_key", "url"})
+
+
+def build_data_params(
+    url: Any,
+    country: Optional[str],
+    transcript: Optional[bool],
+    transcript_language: Optional[str],
+    extra: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Validate ``data`` arguments and return its query params (``api_key`` not included).
+
+    Deliberately no site check: supported sites are added server-side, and an
+    unsupported URL or page type gets a free 400 (:class:`BadRequestError`) whose
+    message lists what is supported. The
+    only client-side check is that ``url`` is a non-blank ``str`` (sent untrimmed).
+
+    ``extra`` holds provider-specific query params sent as-is (scalars only);
+    ``api_key`` and ``url`` are rejected rather than silently overridden.
+    """
+    if not isinstance(url, str):
+        raise ValueError(f"url must be a str, got {type(url).__name__}")
+    if not url.strip():
+        raise ValueError("url is required")
+    params: Dict[str, Any] = {}
+    for key, value in extra.items():
+        if key in _DATA_RESERVED_PARAMS:
+            raise ValueError(f"{key} can't be passed as an extra data() param")
+        if value is not None and not isinstance(value, (str, int, float, bool)):
+            raise ValueError(
+                f"extra data() param {key} must be a str, int, float or bool, "
+                f"got {type(value).__name__}"
+            )
+        params[key] = value
+    params.update(
+        {
+            key: value
+            for key, value in (
+                ("country", country),
+                ("transcript", transcript),
+                ("transcript_language", transcript_language),
+            )
+            if value is not None
+        }
+    )
+    params["url"] = url
+    return params

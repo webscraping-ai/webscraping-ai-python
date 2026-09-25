@@ -53,6 +53,10 @@ fields = client.fields(
 # Google search results (SERP) for a query
 results = client.serp("coffee machines", gl="us", hl="en", page=1)
 
+# Structured data for a page on a supported site (YouTube, TikTok, X, LinkedIn, Instagram, Reddit, ...)
+video = client.data("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+print(video["data"]["title"])
+
 # Account quota
 info = client.account()
 ```
@@ -142,6 +146,7 @@ them too.
 | `client.question(...)`          | `GET /ai/question`  | `str`                         |
 | `client.fields(...)`            | `GET /ai/fields`    | `dict` (wrapped under `result`) |
 | `client.serp(...)`              | `GET /serp`         | `dict` (`SerpResult`)         |
+| `client.data(...)`              | `GET /data`         | `dict` (`DataResult`)         |
 | `client.account()`              | `GET /account`      | `dict`                        |
 
 Every page-fetch method accepts the full set of API parameters as keyword
@@ -186,6 +191,46 @@ optional `snippet` and `date`), optional `related_searches` (`query`), and
 `pagination` (`current`, optional `next`). Optional keys are absent when the
 engine does not show them, so use `.get()` for those.
 
+### Structured data
+
+`client.data(url, *, country=None, transcript=None, transcript_language=None, **params)`
+(and `await AsyncClient.data(...)`) returns structured JSON for a public page on a
+supported site. Pass the page's normal URL; the site (`provider`) and page kind
+(`type`) are detected from it. Flat 15 credits per request, including pages that
+parse empty (`parse_status` `"parse_failed"`) or no longer exist (`"not_found"`);
+failed fetches are not charged. None of the page-fetch parameters above apply.
+
+Supported sites today include, for example, YouTube (video/channel/playlist),
+TikTok (video/profile), X/Twitter (tweet/profile), LinkedIn (company/job/profile),
+Instagram (post/reel/profile) and Reddit (post/subreddit/user). **More sites are
+added server-side** and work with this package without an upgrade: the client
+never checks the URL's site. An unsupported URL or page type returns a 400 that
+is not charged (`BadRequestError`). Its message lists what is supported.
+
+| Parameter             | Type   | Default | Description |
+| --------------------- | ------ | ------- | ----------- |
+| `url`                 | `str`  | —       | Page URL (required). A blank or non-str `url` raises `ValueError`; passing `url` twice (e.g. again in `**params`) raises `TypeError` |
+| `country`             | `str`  | `"us"`  | Two-letter country code of the proxy used to fetch the page, `us` by default |
+| `transcript`          | `bool` | `False` | YouTube videos only. Also fetch the video's transcript into `data.transcript`. It's null when no matching captions are available. If the transcript fetch itself fails, the whole request fails with a 500 and is not charged |
+| `transcript_language` | `str`  | —       | Caption language to pick, e.g. `en` or `de`. Without it, English is preferred, then the first available track. If the video has no captions in that language, `data.transcript` is null |
+| `**params`            | `str`, `int`, `float`, `bool` | — | Extra query params sent as-is, for provider-specific params added later (`None` omits one). `api_key` raises `ValueError` |
+
+```python
+result = client.data("https://www.youtube.com/watch?v=dQw4w9WgXcQ", transcript=True)
+result["request_parameters"]  # {"url": "...", "provider": "youtube", "type": "video"}
+result["parse_status"]        # "ok" (or "parse_failed" / "not_found")
+result["data"]                # shape depends on provider and type; may be None
+
+try:
+    client.data("https://example.com/")
+except BadRequestError as e:
+    print(e.message)  # "Unsupported URL for /data. Supported sites: youtube, tiktok, ..."
+```
+
+`provider`, `type` and `parse_status` are open sets of strings, and `data` is
+the decoded JSON as-is (no per-site classes), so new sites and fields show up
+without a package release.
+
 ### API response-shape notes
 
 Two endpoints return shapes that differ from the OpenAPI spec examples. The
@@ -211,10 +256,12 @@ mypy src/webscraping_ai
 `bin/smoke.py` hits every endpoint once against the live API through the sync `Client`, plus one
 `account` call through `AsyncClient`. It puts `src/` first on `sys.path`, so it always tests the
 working tree (you still need the runtime deps, e.g. from `pip install -e ".[dev]"`). It is not
-part of the pytest suite and costs ~32 credits per run: the four page calls run with `js=False`
-and `proxy="datacenter"` (1 credit each), `question` and `fields` cost 6 each, and the SERP call
-is 15. Each case checks the result shape, not just that no exception was raised (SERP must return
-organic results for the query sent, `selected_multiple` must match something, and so on), and
+part of the pytest suite and costs ~47 credits per run: the four page calls run with `js=False`
+and `proxy="datacenter"` (1 credit each), `question` and `fields` cost 6 each, and the SERP and
+`/data` (YouTube video) calls are 15 each. A second `/data` call on `https://example.com/` must
+come back as the server's free 400, proving there is no client-side site filter. Each case checks
+the result shape, not just that no exception was raised (SERP must return organic results for the
+query sent, `/data` must parse a title, `selected_multiple` must match something, and so on), and
 FAIL lines redact the API key.
 
 ```bash

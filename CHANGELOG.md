@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.2.0 — 2026-09-25
+### Added
+
+- `Client.data(url, *, country, transcript, transcript_language, **params)` and
+  `AsyncClient.data(...)` for the `GET /data` endpoint — structured JSON for a
+  page on a supported site (e.g. YouTube, TikTok, X, LinkedIn, Instagram,
+  Reddit) as a dict with `request_parameters`, `parse_status` and `data`. Flat
+  15 credits per request. The client does not check the URL's site: new sites
+  are added server-side, and an unsupported URL or page type returns a 400
+  that is not charged (`BadRequestError`); its message lists what is supported. Raises `ValueError` before any request when `url` is not a
+  non-blank `str`. Extra keyword arguments are sent as-is as query params
+  (scalars only; `api_key` raises `ValueError`, a second `url` is a
+  `TypeError`).
+- `bin/smoke.py` checks `/data` on a YouTube video and that
+  `https://example.com/` gets the server's 400 "Unsupported URL" error (~47
+  credits per sweep).
+
 ## 4.1.0 — 2026-09-25
 
 ### Added

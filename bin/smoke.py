@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Hand-run smoke test against the live API. Not part of the test suite —
-costs ~32 credits per full sweep: 4 page calls x 1 (js=False, datacenter
-proxy), question + fields 2 x 6, serp 15, account free.
+costs ~47 credits per full sweep: 4 page calls x 1 (js=False, datacenter
+proxy), question + fields 2 x 6, serp 15, data 15, data_unsupported free
+(the server's 400), account free.
 
 Every endpoint runs once through the sync ``Client``; ``account`` also
 runs through ``AsyncClient`` so the async transport is exercised too.
@@ -21,13 +22,14 @@ from typing import Any, Callable, Dict, List, Tuple
 # Load the package from the working tree, not a site-packages install.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from webscraping_ai import AsyncClient, Client
+from webscraping_ai import AsyncClient, BadRequestError, Client
 
 TARGET = "https://example.com"
 # Page tools run without JS on datacenter proxies so each call costs the documented
 # 1 credit (AI tools 6); the API default js=True would cost several times more.
 PAGE_OPTS: Dict[str, Any] = {"js": False, "proxy": "datacenter"}
 SERP_QUERY = "coffee machines"
+DATA_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
 class SmokeCheckFailed(Exception):
@@ -64,6 +66,30 @@ def check_serp(result: Any) -> str:
     check(actual_q == SERP_QUERY, f"serp search_parameters.q was {actual_q!r}")
     first = organic[0].get("title") if isinstance(organic[0], dict) else None
     return f"{len(organic)} organic results, first: {json.dumps(first)}"
+
+
+def check_data(result: Any) -> str:
+    check(isinstance(result, dict), f"data returned {type(result).__name__}")
+    status = result.get("parse_status")
+    check(status == "ok", f"data parse_status was {status!r}")
+    request_parameters = result.get("request_parameters") or {}
+    provider = request_parameters.get("provider")
+    check(provider == "youtube", f"data request_parameters.provider was {provider!r}")
+    payload = result.get("data")
+    title = payload.get("title") if isinstance(payload, dict) else None
+    check(isinstance(title, str) and bool(title.strip()), "data returned no data.title")
+    return f"{provider}/{request_parameters.get('type')} {status}, title: {json.dumps(title)}"
+
+
+def check_data_unsupported(client: Client) -> str:
+    # No client-side site filter: the URL must reach the server and get its free 400.
+    try:
+        client.data("https://example.com/")
+    except BadRequestError as e:
+        check(e.status == 400, f"data_unsupported status was {e.status}")
+        check("Unsupported URL" in e.message, f"data_unsupported message was {e.message!r}")
+        return f"server 400: {e.message}"
+    raise SmokeCheckFailed("data on https://example.com/ unexpectedly succeeded")
 
 
 def preview(result: Any) -> str:
@@ -139,6 +165,8 @@ def main() -> int:
                 ),
             ),
             ("serp", lambda: check_serp(client.serp(SERP_QUERY))),
+            ("data", lambda: check_data(client.data(DATA_URL))),
+            ("data_unsupported", lambda: check_data_unsupported(client)),
             ("account (async)", lambda: asyncio.run(async_account(api_key))),
         ]
         failures = sum(not report(name, call, api_key) for name, call in cases)

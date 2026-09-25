@@ -9,6 +9,7 @@ from . import _query
 from ._transport import (
     DEFAULT_BASE_URL,
     DEFAULT_TIMEOUT,
+    build_data_params,
     build_params,
     parse_response,
     raise_for_status,
@@ -311,6 +312,53 @@ class AsyncClient:
         validate_serp_args(q, page)
         return await self._get("/serp", q=q, engine=engine, gl=gl, hl=hl, page=page)
 
+    async def data(
+        self,
+        url: str,
+        *,
+        country: Optional[str] = None,
+        transcript: Optional[bool] = None,
+        transcript_language: Optional[str] = None,
+        **params: Any,
+    ) -> Any:
+        """``GET /data`` — structured JSON for a page on a supported site.
+
+        Returns the decoded ``DataResult`` dict: ``request_parameters``
+        (``url``, ``provider``, ``type``), ``parse_status`` (``"ok"``,
+        ``"parse_failed"`` or ``"not_found"``, all billed) and ``data``, whose
+        shape depends on provider and type and which may be ``None``. Flat 15
+        credits per request. None of the page-fetch options apply.
+
+        Supported sites (e.g. YouTube, TikTok, X/Twitter, LinkedIn, Instagram,
+        Reddit) are added server-side, so the URL's site is never checked here.
+        An unsupported URL or page type returns a 400 that is not charged
+        (:class:`BadRequestError`); its message lists what is supported.
+        ``provider``, ``type`` and ``parse_status`` are open sets of strings.
+
+        ``country``: two-letter country code of the proxy used to fetch the
+        page, ``us`` by default.
+
+        ``transcript``: YouTube videos only. Also fetch the video's transcript
+        into ``data.transcript``. It's null when no matching captions are
+        available. If the transcript fetch itself fails, the whole request
+        fails with a 500 and is not charged.
+
+        ``transcript_language``: caption language to pick, e.g. ``en`` or
+        ``de``. Without it, English is preferred, then the first available
+        track. If the video has no captions in that language,
+        ``data.transcript`` is null.
+
+        Any other keyword arguments are sent as-is as extra query params (for
+        provider-specific params added later); they must be scalars. ``api_key``
+        raises :class:`ValueError`; a second ``url`` is a :class:`TypeError`
+        (Python's duplicate-argument error), so neither can be overridden.
+
+        Raises :class:`ValueError` before any request when ``url`` is not a
+        non-blank ``str`` or an extra param is invalid.
+        """
+        query = build_data_params(url, country, transcript, transcript_language, params)
+        return await self._request("/data", query)
+
     async def account(self) -> Any:
         """``GET /account`` — quota / billing-cycle info for the API key."""
         return await self._get("/account")
@@ -339,6 +387,9 @@ class AsyncClient:
     # ------------------------------------------------------------------
 
     async def _get(self, path: str, **params: Any) -> Any:
+        return await self._request(path, params)
+
+    async def _request(self, path: str, params: Mapping[str, Any]) -> Any:
         request_params = build_params(self._api_key, **params)
         encoded = _query.encode(request_params)
         wrapped: Optional[Exception] = None

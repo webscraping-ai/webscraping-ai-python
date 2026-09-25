@@ -2,6 +2,7 @@
 
 import logging
 import traceback
+from urllib.parse import parse_qsl
 
 import httpx
 import pytest
@@ -363,3 +364,154 @@ def test_httpx_request_log_redacts_api_key(caplog):
     assert any("api_key=[REDACTED]" in m for m in messages)
     assert all(SECRET_KEY not in m for m in messages)
     assert all(SECRET_KEY not in str(r.args) for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# /data
+# ---------------------------------------------------------------------------
+
+VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+DATA_BODY = {
+    "request_parameters": {"url": VIDEO_URL, "provider": "youtube", "type": "video"},
+    "parse_status": "ok",
+    "data": {"video_id": "dQw4w9WgXcQ", "title": "Never Gonna Give You Up", "tags": ["rick"]},
+}
+JSON = {"content-type": "application/json"}
+
+
+def _mock_data(body=DATA_BODY, status=200):
+    return respx.get(f"{BASE}/data").mock(
+        return_value=httpx.Response(status, json=body, headers=JSON)
+    )
+
+
+@respx.mock
+def test_data_passes_query_params_and_returns_json(client):
+    route = _mock_data()
+    out = client.data(VIDEO_URL, country="de", transcript=True, transcript_language="en")
+    assert out == DATA_BODY
+    params = route.calls.last.request.url.params
+    assert params["api_key"] == API_KEY
+    assert params["url"] == VIDEO_URL
+    assert params["country"] == "de"
+    assert params["transcript"] == "true"
+    assert params["transcript_language"] == "en"
+
+
+@respx.mock
+def test_data_omits_unset_params_and_sends_false_transcript(client):
+    route = _mock_data()
+    client.data(url=VIDEO_URL)
+    assert sorted(route.calls.last.request.url.params.keys()) == ["api_key", "url"]
+    client.data(VIDEO_URL, transcript=False)
+    assert route.calls.last.request.url.params["transcript"] == "false"
+
+
+@respx.mock
+def test_data_sends_extra_params_as_is_and_escaped(client):
+    route = _mock_data()
+    client.data(VIDEO_URL, comments=True, limit=5, sort="new", **{"a&b": "c=d&e"})
+    params = route.calls.last.request.url.params
+    assert params["comments"] == "true"
+    assert params["limit"] == "5"
+    assert params["sort"] == "new"
+    assert params["a&b"] == "c=d&e"
+    raw = route.calls.last.request.url.raw_path.decode()
+    assert "a%26b=c%3Dd%26e" in raw
+
+
+@respx.mock
+def test_data_sends_hostile_unknown_site_url_unmodified(client):
+    odd = "  https://Example.COM/A%2Fb/\u00fcn\u00ef?x=1&y=a b#Frag  "
+    route = _mock_data()
+    client.data(odd)
+    raw_query = route.calls.last.request.url.query.decode("ascii")
+    assert parse_qsl(raw_query, keep_blank_values=True) == [("api_key", API_KEY), ("url", odd)]
+
+
+@pytest.mark.parametrize("url", ["", "   ", "\t\n "])
+@respx.mock
+def test_data_requires_url(client, url):
+    route = respx.get(f"{BASE}/data")
+    with pytest.raises(ValueError, match="url is required"):
+        client.data(url)
+    assert not route.called
+
+
+@pytest.mark.parametrize("url", [None, 123, b"https://example.com"])
+@respx.mock
+def test_data_rejects_non_str_url(client, url):
+    route = respx.get(f"{BASE}/data")
+    with pytest.raises(ValueError, match="url must be a str"):
+        client.data(url)
+    assert not route.called
+
+
+@respx.mock
+def test_data_rejects_api_key_and_url_in_extra_params(client):
+    route = respx.get(f"{BASE}/data")
+    with pytest.raises(ValueError, match="api_key"):
+        client.data(VIDEO_URL, api_key="other")
+    with pytest.raises(TypeError, match="url"):
+        client.data(VIDEO_URL, **{"url": "https://evil.example"})
+    assert not route.called
+
+
+@pytest.mark.parametrize("value", [{"a": 1}, [1, 2], b"x"])
+@respx.mock
+def test_data_rejects_non_scalar_extra_params(client, value):
+    route = respx.get(f"{BASE}/data")
+    with pytest.raises(ValueError, match="must be a str, int, float or bool"):
+        client.data(VIDEO_URL, extra=value)
+    assert not route.called
+
+
+@respx.mock
+def test_data_round_trips_unknown_provider_and_null_data(client):
+    body = {
+        "request_parameters": {"url": VIDEO_URL, "provider": "newsite", "type": "gallery"},
+        "parse_status": "parse_failed",
+        "data": None,
+    }
+    _mock_data(body)
+    out = client.data(VIDEO_URL)
+    assert out["request_parameters"]["provider"] == "newsite"
+    assert out["request_parameters"]["type"] == "gallery"
+    assert out["parse_status"] == "parse_failed"
+    assert "data" in out
+    assert out["data"] is None
+
+
+@respx.mock
+def test_data_400_maps_to_bad_request_error(client):
+    message = "Unsupported URL for /data. Supported sites: youtube, tiktok. Use /ai/fields"
+    _mock_data({"message": message}, status=400)
+    with pytest.raises(BadRequestError) as exc_info:
+        client.data("https://example.com/")
+    assert exc_info.value.status == 400
+    assert exc_info.value.message == message
+
+
+@pytest.mark.parametrize(
+    ("httpx_error", "expected"),
+    [(httpx.ReadTimeout, APITimeoutError), (httpx.ConnectError, APIConnectionError)],
+)
+@respx.mock
+def test_data_transport_errors_do_not_leak_api_key(httpx_error, expected):
+    def raise_with_url(request: httpx.Request) -> httpx.Response:
+        raise httpx_error(f"failed for {request.url}", request=request)
+
+    respx.get(f"{BASE}/data").mock(side_effect=raise_with_url)
+    with Client(api_key=SECRET_KEY) as c, pytest.raises(expected) as exc_info:
+        c.data(VIDEO_URL, comments=True)
+    _assert_key_not_leaked(exc_info.value)
+
+
+@respx.mock
+def test_data_bad_request_error_does_not_leak_api_key():
+    respx.get(f"{BASE}/data").mock(
+        return_value=httpx.Response(400, json={"message": "Unsupported URL"}, headers=JSON)
+    )
+    with Client(api_key=SECRET_KEY) as c, pytest.raises(BadRequestError) as exc_info:
+        c.data("https://example.com/")
+    _assert_key_not_leaked(exc_info.value)

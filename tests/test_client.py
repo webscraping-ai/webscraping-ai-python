@@ -217,14 +217,14 @@ def test_serp_rejects_invalid_page(client, page):
 
 
 @respx.mock
-def test_serp_accepts_pages_above_server_cap(client):
+def test_serp_leaves_pages_above_100_to_server(client):
     route = respx.get(f"{BASE}/serp").mock(
         return_value=httpx.Response(
             200, json=SERP_BODY, headers={"content-type": "application/json"}
         )
     )
     client.serp("coffee machines", page=1)
-    client.serp("coffee machines", page=150)  # server caps at 100; not the client's job
+    client.serp("coffee machines", page=150)  # server 400s pages > 100; not the client's job
     assert route.calls.last.request.url.params["page"] == "150"
 
 

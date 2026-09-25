@@ -305,7 +305,8 @@ class AsyncClient:
 
         Raises :class:`ValueError` before any request when ``q`` is not a
         non-blank ``str`` or ``page`` is not an ``int`` >= 1. ``q`` is sent
-        untrimmed. The server caps ``page`` at 100.
+        untrimmed. Pages are 1-100; the server rejects a ``page`` above 100
+        with a 400 (not billed).
         """
         validate_serp_args(q, page)
         return await self._get("/serp", q=q, engine=engine, gl=gl, hl=hl, page=page)

@@ -9,8 +9,9 @@
   related searches, pagination) as a dict. Flat 15 credits per search. Raises
   `ValueError` before any request when `q` is not a non-blank `str` (e.g.
   `serp(123)`), or when `page` is not an `int` >= 1 (`bool`, floats, 0 and
-  negatives are rejected; the server would silently fall back to page 1 and
-  still bill). The server caps `page` at 100. `q` is sent untrimmed.
+  negatives are rejected; the server also rejects them with a 400, not billed,
+  so checking client-side saves the round trip). Pages are 1–100: the server
+  rejects a `page` above 100 with a 400. `q` is sent untrimmed.
 - `bin/smoke.py` live smoke script: asserts result shapes (not just the absence
   of exceptions), catches every exception per case, runs page tools with
   `js=False` on datacenter proxies (~32 credits per sweep), and redacts the API

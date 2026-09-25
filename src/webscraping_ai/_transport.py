@@ -102,9 +102,10 @@ def validate_serp_args(q: Any, page: Any) -> None:
     """Reject ``serp`` arguments the API would misinterpret, before any request.
 
     ``q`` must be a non-blank ``str`` (it is sent untrimmed). ``page``, when
-    given, must be an ``int`` >= 1 (``bool`` is rejected): the server silently
-    coerces invalid pages to 1 and still bills the search. The server caps
-    ``page`` at 100.
+    given, must be an ``int`` >= 1 (``bool`` is rejected): the server also
+    rejects an invalid page with a 400 (not billed); checking client-side saves
+    the round trip. Pages above 100 are left to the server, which rejects them
+    with a 400.
     """
     if not isinstance(q, str):
         raise ValueError(f"q must be a str, got {type(q).__name__}")

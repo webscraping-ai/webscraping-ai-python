@@ -158,8 +158,9 @@ parameter reference.
 search engine results for a query. It is query-shaped rather than URL-shaped,
 so none of the page-fetch parameters above apply. Flat 15 credits per search;
 failed searches are not charged. Raises `ValueError` before any request when
-`q` is not a non-blank `str` or `page` is not an `int` >= 1 (the server would
-silently fall back to page 1 and still bill the search). `q` is sent as given.
+`q` is not a non-blank `str` or `page` is not an `int` >= 1 (the server also
+rejects it with a 400, not billed; checking client-side saves the round trip).
+`q` is sent as given.
 
 | Parameter | Type  | Default    | Description                                   |
 | --------- | ----- | ---------- | --------------------------------------------- |
@@ -167,7 +168,7 @@ silently fall back to page 1 and still bill the search). `q` is sent as given.
 | `engine`  | `str` | `"google"` | Search engine; currently only `google`        |
 | `gl`      | `str` | `"us"`     | Two-letter country code for the search        |
 | `hl`      | `str` | `"en"`     | Two-letter language code for the results      |
-| `page`    | `int` | `1`        | Results page number (10 per page); >= 1, server caps at 100 |
+| `page`    | `int` | `1`        | Results page number (10 per page); 1–100, server rejects > 100 with a 400 |
 
 ```python
 results = client.serp("coffee machines", gl="gb", page=2)

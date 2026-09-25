@@ -12,6 +12,7 @@ from ._transport import (
     build_params,
     parse_response,
     raise_for_status,
+    validate_serp_args,
     wrap_transport_error,
 )
 from ._version import __version__
@@ -301,9 +302,12 @@ class AsyncClient:
         ``search_information``, ``organic_results``, ``related_searches``,
         ``pagination``); optional keys are absent when the engine shows none.
         Flat 15 credits per search.
+
+        Raises :class:`ValueError` before any request when ``q`` is not a
+        non-blank ``str`` or ``page`` is not an ``int`` >= 1. ``q`` is sent
+        untrimmed. The server caps ``page`` at 100.
         """
-        if not q or not q.strip():
-            raise ValueError("q is required")
+        validate_serp_args(q, page)
         return await self._get("/serp", q=q, engine=engine, gl=gl, hl=hl, page=page)
 
     async def account(self) -> Any:
@@ -336,12 +340,16 @@ class AsyncClient:
     async def _get(self, path: str, **params: Any) -> Any:
         request_params = build_params(self._api_key, **params)
         encoded = _query.encode(request_params)
+        wrapped: Optional[Exception] = None
         try:
             response = await self._http.get(f"{self._base_url}{path}", params=cast(Any, encoded))
-        except Exception as exc:
+        except httpx.TransportError as exc:
             wrapped = wrap_transport_error(exc)
-            if wrapped is not None:
-                raise wrapped from exc
-            raise
+            if wrapped is None:
+                raise
+        if wrapped is not None:
+            # Raised outside the except block so the httpx exception (whose
+            # request URL contains the API key) is neither __cause__ nor __context__.
+            raise wrapped from None
         raise_for_status(response)
         return parse_response(response)

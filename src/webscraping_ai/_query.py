@@ -10,9 +10,13 @@ the combination correctly:
 - flat ``key=value`` for everything else, with booleans serialised as
   the strings ``"true"`` / ``"false"``.
 
-``None`` values are dropped at every level. Spaces are encoded as ``%20``
-(not ``+``) so the encoder output matches what hits the wire after httpx
-URL normalisation.
+``None`` values are dropped at every level.
+
+:func:`encode` does no percent-encoding: the clients hand its (key, value)
+pairs to httpx, which form-encodes them on the wire, so spaces are sent as
+``+`` (and a literal ``+`` as ``%2B``). The API decodes both forms the same
+way. :func:`encode_to_string` is a separate helper that percent-encodes
+spaces as ``%20``; the clients do not use it for requests.
 """
 
 from typing import Any, List, Mapping, Sequence, Tuple
@@ -34,10 +38,9 @@ def _scalar(value: Any) -> str:
 def encode(params: Mapping[str, Any]) -> Params:
     """Encode a mapping of API parameters into a list of (key, value) pairs.
 
-    Each value in the output is already URL-encoded for use in a query string.
-    httpx accepts a list of tuples for ``params=`` but applies its own
-    percent-encoding; to avoid double-encoding we return *un*-percent-encoded
-    values here, and rely on the caller to feed them as-is to httpx.
+    The output values are *not* percent-encoded. httpx accepts a list of
+    tuples for ``params=`` and applies its own form encoding (spaces become
+    ``+``), so returning raw values avoids double-encoding.
 
     Use :func:`encode_to_string` to get a fully percent-encoded query string.
     """
@@ -63,7 +66,8 @@ def encode(params: Mapping[str, Any]) -> Params:
 def encode_to_string(params: Mapping[str, Any]) -> str:
     """Return a fully percent-encoded query string (without leading ``?``).
 
-    Spaces are encoded as ``%20``. Used when the caller wants explicit control
+    Spaces are encoded as ``%20`` here, unlike the ``+`` httpx sends for
+    requests built from :func:`encode`. For callers that want explicit control
     over the URL rather than letting httpx assemble it.
     """
     parts: List[str] = []

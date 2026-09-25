@@ -1,5 +1,8 @@
 """Tests for the sync :class:`Client` against mocked HTTP responses."""
 
+import logging
+import traceback
+
 import httpx
 import pytest
 import respx
@@ -175,7 +178,7 @@ def test_serp_omits_unset_params(client):
     assert sorted(params.keys()) == ["api_key", "q"]
 
 
-@pytest.mark.parametrize("q", ["", "   "])
+@pytest.mark.parametrize("q", ["", "   ", "\t\n "])
 @respx.mock
 def test_serp_requires_q(client, q):
     route = respx.get(f"{BASE}/serp")
@@ -184,8 +187,64 @@ def test_serp_requires_q(client, q):
     assert not route.called
 
 
+@pytest.mark.parametrize("q", [None, 123, b"coffee", ["coffee"]])
 @respx.mock
-def test_serp_maps_errors_without_scraping_envelope(client):
+def test_serp_rejects_non_str_q(client, q):
+    route = respx.get(f"{BASE}/serp")
+    with pytest.raises(ValueError, match="q must be a str"):
+        client.serp(q)
+    assert not route.called
+
+
+@respx.mock
+def test_serp_sends_q_untrimmed(client):
+    route = respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(
+            200, json=SERP_BODY, headers={"content-type": "application/json"}
+        )
+    )
+    client.serp("  coffee machines ")
+    assert route.calls.last.request.url.params["q"] == "  coffee machines "
+
+
+@pytest.mark.parametrize("page", [0, -1, 1.5, 2.0, float("nan"), "2", True, False])
+@respx.mock
+def test_serp_rejects_invalid_page(client, page):
+    route = respx.get(f"{BASE}/serp")
+    with pytest.raises(ValueError, match="page must be an int >= 1"):
+        client.serp("coffee machines", page=page)
+    assert not route.called
+
+
+@respx.mock
+def test_serp_accepts_pages_above_server_cap(client):
+    route = respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(
+            200, json=SERP_BODY, headers={"content-type": "application/json"}
+        )
+    )
+    client.serp("coffee machines", page=1)
+    client.serp("coffee machines", page=150)  # server caps at 100; not the client's job
+    assert route.calls.last.request.url.params["page"] == "150"
+
+
+@respx.mock
+def test_serp_error_message_from_message_body(client):
+    respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(
+            402,
+            json={"message": "Not enough credits"},
+            headers={"content-type": "application/json"},
+        )
+    )
+    with pytest.raises(PaymentRequiredError) as exc_info:
+        client.serp("coffee machines")
+    assert exc_info.value.status == 402
+    assert exc_info.value.message == "Not enough credits"
+
+
+@respx.mock
+def test_serp_tolerates_non_standard_error_body(client):
     respx.get(f"{BASE}/serp").mock(
         return_value=httpx.Response(
             402, json={"error": "Not enough credits"}, headers={"content-type": "application/json"}
@@ -259,3 +318,48 @@ def test_connection_failure_raises_api_connection_error(client):
     respx.get(f"{BASE}/html").mock(side_effect=httpx.ConnectError("refused"))
     with pytest.raises(APIConnectionError):
         client.html("https://example.com")
+
+
+SECRET_KEY = "sk-live-secret-0123456789"
+
+
+def _assert_key_not_leaked(err: BaseException) -> None:
+    formatted = "".join(traceback.format_exception(type(err), err, err.__traceback__))
+    assert SECRET_KEY not in str(err)
+    assert SECRET_KEY not in repr(err)
+    assert SECRET_KEY not in formatted
+    assert err.__cause__ is None
+    assert err.__context__ is None
+
+
+@pytest.mark.parametrize(
+    ("httpx_error", "expected"),
+    [(httpx.ReadTimeout, APITimeoutError), (httpx.ConnectError, APIConnectionError)],
+)
+@respx.mock
+def test_transport_errors_do_not_leak_api_key(httpx_error, expected):
+    def raise_with_url(request: httpx.Request) -> httpx.Response:
+        # Worst case: the transport error's own message embeds the request URL.
+        raise httpx_error(f"failed for {request.url}", request=request)
+
+    respx.get(f"{BASE}/html").mock(side_effect=raise_with_url)
+    with Client(api_key=SECRET_KEY) as c, pytest.raises(expected) as exc_info:
+        c.html("https://example.com")
+    err = exc_info.value
+    assert httpx_error.__name__ in str(err)
+    assert "api_key=[REDACTED]" in str(err)
+    _assert_key_not_leaked(err)
+
+
+@respx.mock
+def test_httpx_request_log_redacts_api_key(caplog):
+    respx.get(f"{BASE}/html").mock(
+        return_value=httpx.Response(200, text="<html/>", headers={"content-type": "text/html"})
+    )
+    with caplog.at_level(logging.INFO, logger="httpx"), Client(api_key=SECRET_KEY) as c:
+        c.html("https://example.com")
+    messages = [r.getMessage() for r in caplog.records if r.name == "httpx"]
+    assert messages, "expected httpx to log the request"
+    assert any("api_key=[REDACTED]" in m for m in messages)
+    assert all(SECRET_KEY not in m for m in messages)
+    assert all(SECRET_KEY not in str(r.args) for r in caplog.records)

@@ -13,8 +13,11 @@ from ._errors import (
     ServerError,
     WebScrapingAIError,
 )
+from ._logging import install_httpx_log_filter
 from ._version import __version__
 from .client import Client
+
+install_httpx_log_filter()
 
 __all__ = [
     "APIConnectionError",

@@ -118,6 +118,19 @@ the client raises with a single `except` if you prefer. API errors expose the
 parsed error envelope (`message`, `status`, `status_code`, `status_message`,
 `body`, `response_body`).
 
+`APITimeoutError` and `APIConnectionError` are raised without chaining the
+underlying httpx exception (it holds the request URL, which contains your API
+key); the original exception type is named in the message instead.
+
+### Logging and your API key
+
+The API key travels in the query string, and httpx logs every request URL at
+`INFO` on the `httpx` logger. Importing `webscraping_ai` installs a
+`logging.Filter` on that logger that rewrites `api_key=<value>` to
+`api_key=[REDACTED]`, so enabling `INFO` logging does not leak the key. The
+filter only covers the `httpx` logger; if you log request URLs yourself, redact
+them too.
+
 ## Endpoint reference
 
 | Method                          | HTTP route          | Returns                       |
@@ -144,7 +157,9 @@ parameter reference.
 `client.serp(q, *, engine=None, gl=None, hl=None, page=None)` returns parsed
 search engine results for a query. It is query-shaped rather than URL-shaped,
 so none of the page-fetch parameters above apply. Flat 15 credits per search;
-failed searches are not charged. Raises `ValueError` when `q` is blank.
+failed searches are not charged. Raises `ValueError` before any request when
+`q` is not a non-blank `str` or `page` is not an `int` >= 1 (the server would
+silently fall back to page 1 and still bill the search). `q` is sent as given.
 
 | Parameter | Type  | Default    | Description                                   |
 | --------- | ----- | ---------- | --------------------------------------------- |
@@ -152,7 +167,7 @@ failed searches are not charged. Raises `ValueError` when `q` is blank.
 | `engine`  | `str` | `"google"` | Search engine; currently only `google`        |
 | `gl`      | `str` | `"us"`     | Two-letter country code for the search        |
 | `hl`      | `str` | `"en"`     | Two-letter language code for the results      |
-| `page`    | `int` | `1`        | Results page number (10 results per page)     |
+| `page`    | `int` | `1`        | Results page number (10 per page); >= 1, server caps at 100 |
 
 ```python
 results = client.serp("coffee machines", gl="gb", page=2)
@@ -195,13 +210,18 @@ mypy src/webscraping_ai
 `bin/smoke.py` hits every endpoint once against the live API through the sync `Client`, plus one
 `account` call through `AsyncClient`. It puts `src/` first on `sys.path`, so it always tests the
 working tree (you still need the runtime deps, e.g. from `pip install -e ".[dev]"`). It is not
-part of the pytest suite and costs ~32 credits per run (the SERP call alone is 15).
+part of the pytest suite and costs ~32 credits per run: the four page calls run with `js=False`
+and `proxy="datacenter"` (1 credit each), `question` and `fields` cost 6 each, and the SERP call
+is 15. Each case checks the result shape, not just that no exception was raised (SERP must return
+organic results for the query sent, `selected_multiple` must match something, and so on), and
+FAIL lines redact the API key.
 
 ```bash
 WEBSCRAPING_AI_API_KEY=... python bin/smoke.py
 ```
 
-Each call prints an `ok` or `FAIL` line; the script exits non-zero if any call fails.
+Each call prints an `ok` or `FAIL` line (any exception counts as a failure, and the sweep
+continues); the script exits non-zero if any call fails.
 
 ## Links
 

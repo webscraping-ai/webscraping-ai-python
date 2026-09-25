@@ -16,6 +16,7 @@ from ._errors import (
     APIError,
     APITimeoutError,
 )
+from ._logging import redact
 
 DEFAULT_BASE_URL = "https://api.webscraping.ai"
 DEFAULT_TIMEOUT = 60.0
@@ -78,9 +79,36 @@ def wrap_transport_error(exc: Exception) -> Optional[Exception]:
 
     Returns the wrapped exception, or ``None`` if ``exc`` is not a recognised
     httpx transport error (in which case the caller should let it propagate).
+
+    The returned error must be raised *outside* the ``except`` block that
+    caught ``exc`` (see the clients' ``_get``), so it carries neither
+    ``__cause__`` nor ``__context__``: the httpx exception holds the request,
+    whose URL contains the API key. The original exception type is kept in
+    the message instead, and any ``api_key=...`` in its text is redacted.
     """
     if isinstance(exc, httpx.TimeoutException):
-        return APITimeoutError(str(exc) or "Request timed out")
+        return APITimeoutError(_describe(exc, "Request timed out"))
     if isinstance(exc, httpx.TransportError):
-        return APIConnectionError(str(exc) or "Connection failed")
+        return APIConnectionError(_describe(exc, "Connection failed"))
     return None
+
+
+def _describe(exc: Exception, fallback: str) -> str:
+    detail = redact(str(exc)) or fallback
+    return f"{type(exc).__name__}: {detail}"
+
+
+def validate_serp_args(q: Any, page: Any) -> None:
+    """Reject ``serp`` arguments the API would misinterpret, before any request.
+
+    ``q`` must be a non-blank ``str`` (it is sent untrimmed). ``page``, when
+    given, must be an ``int`` >= 1 (``bool`` is rejected): the server silently
+    coerces invalid pages to 1 and still bills the search. The server caps
+    ``page`` at 100.
+    """
+    if not isinstance(q, str):
+        raise ValueError(f"q must be a str, got {type(q).__name__}")
+    if not q.strip():
+        raise ValueError("q is required")
+    if page is not None and (isinstance(page, bool) or not isinstance(page, int) or page < 1):
+        raise ValueError(f"page must be an int >= 1, got {page!r}")

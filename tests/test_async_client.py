@@ -1,5 +1,7 @@
 """Tests for the :class:`AsyncClient` against mocked HTTP responses."""
 
+import traceback
+
 import httpx
 import pytest
 import respx
@@ -65,10 +67,34 @@ async def test_async_serp_passes_query_params_and_returns_json():
     assert "engine" not in params
 
 
-async def test_async_serp_requires_q():
+@pytest.mark.parametrize("q", ["", "   ", "\t\n "])
+@respx.mock
+async def test_async_serp_requires_q(q):
+    route = respx.get(f"{BASE}/serp")
     async with AsyncClient(api_key=API_KEY) as c:
         with pytest.raises(ValueError, match="q is required"):
-            await c.serp("")
+            await c.serp(q)
+    assert not route.called
+
+
+@pytest.mark.parametrize("q", [None, 123])
+@respx.mock
+async def test_async_serp_rejects_non_str_q(q):
+    route = respx.get(f"{BASE}/serp")
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(ValueError, match="q must be a str"):
+            await c.serp(q)
+    assert not route.called
+
+
+@pytest.mark.parametrize("page", [0, -1, 1.5, float("nan"), "2", True])
+@respx.mock
+async def test_async_serp_rejects_invalid_page(page):
+    route = respx.get(f"{BASE}/serp")
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(ValueError, match="page must be an int >= 1"):
+            await c.serp("coffee", page=page)
+    assert not route.called
 
 
 @respx.mock
@@ -147,3 +173,29 @@ def test_sync_and_async_clients_share_error_hierarchy():
     sync = Client
     asyn = AsyncClient
     assert sync is not asyn
+
+
+SECRET_KEY = "sk-live-secret-0123456789"
+
+
+@pytest.mark.parametrize(
+    ("httpx_error", "expected"),
+    [(httpx.ReadTimeout, APITimeoutError), (httpx.ConnectError, APIConnectionError)],
+)
+@respx.mock
+async def test_async_transport_errors_do_not_leak_api_key(httpx_error, expected):
+    def raise_with_url(request: httpx.Request) -> httpx.Response:
+        raise httpx_error(f"failed for {request.url}", request=request)
+
+    respx.get(f"{BASE}/html").mock(side_effect=raise_with_url)
+    async with AsyncClient(api_key=SECRET_KEY) as c:
+        with pytest.raises(expected) as exc_info:
+            await c.html("https://example.com")
+    err = exc_info.value
+    formatted = "".join(traceback.format_exception(type(err), err, err.__traceback__))
+    assert httpx_error.__name__ in str(err)
+    assert SECRET_KEY not in str(err)
+    assert SECRET_KEY not in repr(err)
+    assert SECRET_KEY not in formatted
+    assert err.__cause__ is None
+    assert err.__context__ is None

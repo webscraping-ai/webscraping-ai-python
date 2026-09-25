@@ -7,7 +7,27 @@
 - `Client.serp(q, *, engine, gl, hl, page)` and `AsyncClient.serp(...)` for the
   new `GET /serp` endpoint — parsed Google search results (organic results,
   related searches, pagination) as a dict. Flat 15 credits per search. Raises
-  `ValueError` when `q` is blank.
+  `ValueError` before any request when `q` is not a non-blank `str` (e.g.
+  `serp(123)`), or when `page` is not an `int` >= 1 (`bool`, floats, 0 and
+  negatives are rejected; the server would silently fall back to page 1 and
+  still bill). The server caps `page` at 100. `q` is sent untrimmed.
+- `bin/smoke.py` live smoke script: asserts result shapes (not just the absence
+  of exceptions), catches every exception per case, runs page tools with
+  `js=False` on datacenter proxies (~32 credits per sweep), and redacts the API
+  key from its output.
+
+### Fixed
+
+- The API key no longer leaks through transport errors. `APITimeoutError` and
+  `APIConnectionError` were raised `from` the httpx exception, whose
+  `request.url` carries `api_key`; they are now raised with no `__cause__` or
+  `__context__`, name the original exception type in the message, and redact
+  `api_key=...` from its text.
+- The API key no longer leaks through httpx's `INFO` request log. Importing
+  `webscraping_ai` installs a `logging.Filter` on the `httpx` logger that
+  rewrites `api_key=<value>` to `api_key=[REDACTED]`.
+- `_query` docstrings claimed spaces are sent as `%20`; httpx actually sends
+  `+`. Docs corrected, encoding unchanged.
 
 ## 4.0.1 — 2026-07-17
 

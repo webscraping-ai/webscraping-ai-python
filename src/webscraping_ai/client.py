@@ -285,6 +285,27 @@ class Client:
             js_script=js_script,
         )
 
+    def serp(
+        self,
+        q: str,
+        *,
+        engine: Optional[str] = None,
+        gl: Optional[str] = None,
+        hl: Optional[str] = None,
+        page: Optional[int] = None,
+    ) -> Any:
+        """``GET /serp`` — parsed search engine results for a query.
+
+        Query-shaped rather than URL-shaped, so none of the page-fetch options
+        apply. Returns the decoded ``SerpResult`` dict (``search_parameters``,
+        ``search_information``, ``organic_results``, ``related_searches``,
+        ``pagination``); optional keys are absent when the engine shows none.
+        Flat 15 credits per search.
+        """
+        if not q or not q.strip():
+            raise ValueError("q is required")
+        return self._get("/serp", q=q, engine=engine, gl=gl, hl=hl, page=page)
+
     def account(self) -> Any:
         """``GET /account`` — quota / billing-cycle info for the API key."""
         return self._get("/account")

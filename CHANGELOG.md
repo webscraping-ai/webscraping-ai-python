@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.1.0 — 2026-09-25
+
+### Added
+
+- `Client.serp(q, *, engine, gl, hl, page)` and `AsyncClient.serp(...)` for the
+  new `GET /serp` endpoint — parsed Google search results (organic results,
+  related searches, pagination) as a dict. Flat 15 credits per search. Raises
+  `ValueError` when `q` is blank.
+
 ## 4.0.1 — 2026-07-17
 
 ### Changed

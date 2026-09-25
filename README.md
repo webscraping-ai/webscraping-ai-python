@@ -50,6 +50,9 @@ fields = client.fields(
     fields={"title": "Main product title", "price": "Current product price"},
 )
 
+# Google search results (SERP) for a query
+results = client.serp("coffee machines", gl="us", hl="en", page=1)
+
 # Account quota
 info = client.account()
 ```
@@ -125,6 +128,7 @@ parsed error envelope (`message`, `status`, `status_code`, `status_message`,
 | `client.selected_multiple(...)` | `GET /selected-multiple` | `list`                   |
 | `client.question(...)`          | `GET /ai/question`  | `str`                         |
 | `client.fields(...)`            | `GET /ai/fields`    | `dict` (wrapped under `result`) |
+| `client.serp(...)`              | `GET /serp`         | `dict` (`SerpResult`)         |
 | `client.account()`              | `GET /account`      | `dict`                        |
 
 Every page-fetch method accepts the full set of API parameters as keyword
@@ -134,6 +138,37 @@ arguments: `headers`, `timeout`, `js`, `js_timeout`, `wait_for`, `proxy`,
 `text_format`, `return_links`, `selector`, `selectors`, `question`, `fields`).
 See the [API documentation](https://webscraping.ai/docs) for the full
 parameter reference.
+
+### SERP
+
+`client.serp(q, *, engine=None, gl=None, hl=None, page=None)` returns parsed
+search engine results for a query. It is query-shaped rather than URL-shaped,
+so none of the page-fetch parameters above apply. Flat 15 credits per search;
+failed searches are not charged. Raises `ValueError` when `q` is blank.
+
+| Parameter | Type  | Default    | Description                                   |
+| --------- | ----- | ---------- | --------------------------------------------- |
+| `q`       | `str` | —          | Search query (required)                       |
+| `engine`  | `str` | `"google"` | Search engine; currently only `google`        |
+| `gl`      | `str` | `"us"`     | Two-letter country code for the search        |
+| `hl`      | `str` | `"en"`     | Two-letter language code for the results      |
+| `page`    | `int` | `1`        | Results page number (10 results per page)     |
+
+```python
+results = client.serp("coffee machines", gl="gb", page=2)
+print(results["search_information"]["organic_results_state"])  # "Results for exact spelling"
+for r in results["organic_results"]:
+    print(r["position"], r["title"], r["link"])
+print(results["pagination"])  # {"current": 2, "next": 3}
+```
+
+The response dict has `search_parameters` (`engine`, `q`, `gl`, `hl`, `page`),
+`search_information` (`query_displayed`, `organic_results_state`, optional
+`showing_results_for` and `total_results`), `organic_results` (`position` —
+1-based within the page — `title`, `link`, `domain`, `displayed_link`,
+optional `snippet` and `date`), optional `related_searches` (`query`), and
+`pagination` (`current`, optional `next`). Optional keys are absent when the
+engine does not show them, so use `.get()` for those.
 
 ### API response-shape notes
 

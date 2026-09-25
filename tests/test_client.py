@@ -120,6 +120,84 @@ def test_account_returns_json(client):
     assert out["remaining_api_calls"] == 1000
 
 
+SERP_BODY = {
+    "search_parameters": {
+        "engine": "google",
+        "q": "coffee machines",
+        "gl": "de",
+        "hl": "de",
+        "page": 2,
+    },
+    "search_information": {
+        "query_displayed": "coffee machines",
+        "organic_results_state": "Results for exact spelling",
+    },
+    "organic_results": [
+        {
+            "position": 1,
+            "title": "Best Coffee Machines",
+            "link": "https://www.example.com/best",
+            "domain": "example.com",
+            "displayed_link": "www.example.com \u203a Reviews",
+        }
+    ],
+    "pagination": {"current": 2, "next": 3},
+}
+
+
+@respx.mock
+def test_serp_passes_query_params_and_returns_json(client):
+    route = respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(
+            200, json=SERP_BODY, headers={"content-type": "application/json"}
+        )
+    )
+    out = client.serp("coffee machines", engine="google", gl="de", hl="de", page=2)
+    assert out == SERP_BODY
+    params = route.calls.last.request.url.params
+    assert params["api_key"] == API_KEY
+    assert params["q"] == "coffee machines"
+    assert params["engine"] == "google"
+    assert params["gl"] == "de"
+    assert params["hl"] == "de"
+    assert params["page"] == "2"
+
+
+@respx.mock
+def test_serp_omits_unset_params(client):
+    route = respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(
+            200, json=SERP_BODY, headers={"content-type": "application/json"}
+        )
+    )
+    client.serp(q="coffee machines")
+    params = route.calls.last.request.url.params
+    assert sorted(params.keys()) == ["api_key", "q"]
+
+
+@pytest.mark.parametrize("q", ["", "   "])
+@respx.mock
+def test_serp_requires_q(client, q):
+    route = respx.get(f"{BASE}/serp")
+    with pytest.raises(ValueError, match="q is required"):
+        client.serp(q)
+    assert not route.called
+
+
+@respx.mock
+def test_serp_maps_errors_without_scraping_envelope(client):
+    respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(
+            402, json={"error": "Not enough credits"}, headers={"content-type": "application/json"}
+        )
+    )
+    with pytest.raises(PaymentRequiredError) as exc_info:
+        client.serp("coffee machines")
+    assert exc_info.value.status == 402
+    assert exc_info.value.status_code is None
+    assert "Not enough credits" in exc_info.value.response_body
+
+
 @pytest.mark.parametrize(
     ("status", "error_class"),
     [

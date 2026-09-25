@@ -10,6 +10,7 @@ from webscraping_ai import (
     AsyncClient,
     AuthenticationError,
     Client,
+    RateLimitError,
     ServerError,
 )
 
@@ -42,6 +43,46 @@ async def test_async_account_returns_json():
     async with AsyncClient(api_key=API_KEY) as c:
         out = await c.account()
     assert out == {"remaining_api_calls": 99}
+
+
+@respx.mock
+async def test_async_serp_passes_query_params_and_returns_json():
+    body = {
+        "search_parameters": {"engine": "google", "q": "coffee", "gl": "us", "hl": "en", "page": 3},
+        "search_information": {"query_displayed": "coffee", "organic_results_state": "Fully empty"},
+        "organic_results": [],
+        "pagination": {"current": 3},
+    }
+    route = respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(200, json=body, headers={"content-type": "application/json"})
+    )
+    async with AsyncClient(api_key=API_KEY) as c:
+        out = await c.serp("coffee", page=3)
+    assert out == body
+    params = route.calls.last.request.url.params
+    assert params["q"] == "coffee"
+    assert params["page"] == "3"
+    assert "engine" not in params
+
+
+async def test_async_serp_requires_q():
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(ValueError, match="q is required"):
+            await c.serp("")
+
+
+@respx.mock
+async def test_async_serp_429_raises_rate_limit_error():
+    respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(
+            429, json={"message": "Too many requests"}, headers={"content-type": "application/json"}
+        )
+    )
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(RateLimitError) as exc_info:
+            await c.serp("coffee")
+    assert exc_info.value.status == 429
+    assert exc_info.value.message == "Too many requests"
 
 
 @respx.mock

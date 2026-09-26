@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+### Changed
+
+- Docs: stop stating credit prices (they're set server-side and change); link to https://webscraping.ai/docs pricing instead.
+
 ## 4.2.0 — 2026-09-25
 ### Added
 

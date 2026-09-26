@@ -24,8 +24,8 @@ Requires Python 3.9 or newer.
 
 ## Quick start
 
-[Sign up](https://webscraping.ai/auth/sign_up) to get an API key — the free
-trial includes 2,000 credits, no credit card required. Your key lives in the
+[Sign up](https://webscraping.ai/auth/sign_up) to get an API key — a free
+trial, no credit card required. Your key lives in the
 [dashboard](https://webscraping.ai/dashboard).
 
 ```python
@@ -161,8 +161,8 @@ parameter reference.
 
 `client.serp(q, *, engine=None, gl=None, hl=None, page=None)` returns parsed
 search engine results for a query. It is query-shaped rather than URL-shaped,
-so none of the page-fetch parameters above apply. Flat 15 credits per search;
-failed searches are not charged. Raises `ValueError` before any request when
+so none of the page-fetch parameters above apply. Priced per search (see
+[pricing](https://webscraping.ai/docs#serp)); failed searches are not charged. Raises `ValueError` before any request when
 `q` is not a non-blank `str` or `page` is not an `int` >= 1 (the server also
 rejects it with a 400, not billed; checking client-side saves the round trip).
 `q` is sent as given.
@@ -196,9 +196,10 @@ engine does not show them, so use `.get()` for those.
 `client.data(url, *, country=None, transcript=None, transcript_language=None, **params)`
 (and `await AsyncClient.data(...)`) returns structured JSON for a public page on a
 supported site. Pass the page's normal URL; the site (`provider`) and page kind
-(`type`) are detected from it. Flat 15 credits per request, including pages that
-parse empty (`parse_status` `"parse_failed"`) or no longer exist (`"not_found"`);
-failed fetches are not charged. None of the page-fetch parameters above apply.
+(`type`) are detected from it. Priced per site (see
+[pricing](https://webscraping.ai/docs#data)), including pages that parse empty
+(`parse_status` `"parse_failed"`) or no longer exist (`"not_found"`);
+unsupported URLs and failed fetches are not charged. None of the page-fetch parameters above apply.
 
 Supported sites today include, for example, YouTube (video/channel/playlist),
 TikTok (video/profile), X/Twitter (tweet/profile), LinkedIn (company/job/profile),

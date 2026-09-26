@@ -302,7 +302,8 @@ class Client:
         apply. Returns the decoded ``SerpResult`` dict (``search_parameters``,
         ``search_information``, ``organic_results``, ``related_searches``,
         ``pagination``); optional keys are absent when the engine shows none.
-        Flat 15 credits per search.
+        Priced per search (see https://webscraping.ai/docs#serp); failed
+        searches are not charged.
 
         Raises :class:`ValueError` before any request when ``q`` is not a
         non-blank ``str`` or ``page`` is not an ``int`` >= 1. ``q`` is sent
@@ -326,8 +327,9 @@ class Client:
         Returns the decoded ``DataResult`` dict: ``request_parameters``
         (``url``, ``provider``, ``type``), ``parse_status`` (``"ok"``,
         ``"parse_failed"`` or ``"not_found"``, all billed) and ``data``, whose
-        shape depends on provider and type and which may be ``None``. Flat 15
-        credits per request. None of the page-fetch options apply.
+        shape depends on provider and type and which may be ``None``. Priced
+        per site (see https://webscraping.ai/docs#data); unsupported URLs and
+        failed fetches are not charged. None of the page-fetch options apply.
 
         Supported sites (e.g. YouTube, TikTok, X/Twitter, LinkedIn, Instagram,
         Reddit) are added server-side, so the URL's site is never checked here.

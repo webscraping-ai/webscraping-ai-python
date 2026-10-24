@@ -1,5 +1,6 @@
 """Tests for the sync :class:`Client` against mocked HTTP responses."""
 
+import enum
 import logging
 import traceback
 from urllib.parse import parse_qsl
@@ -227,6 +228,245 @@ def test_serp_leaves_pages_above_100_to_server(client):
     client.serp("coffee machines", page=1)
     client.serp("coffee machines", page=150)  # server 400s pages > 100; not the client's job
     assert route.calls.last.request.url.params["page"] == "150"
+
+
+def _mock_serp(body=SERP_BODY):
+    return respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(200, json=body, headers={"content-type": "application/json"})
+    )
+
+
+@respx.mock
+def test_serp_passes_location_and_pages_params(client):
+    body = {
+        **SERP_BODY,
+        "search_parameters": {
+            **SERP_BODY["search_parameters"],
+            "pages": 2,
+            "location_requested": "Austin, TX",
+            "location_used": "Austin,Texas,United States",
+            "radius": 500,
+        },
+        "organic_results": [{**SERP_BODY["organic_results"][0], "page": 1}],
+        "pagination": {"current": 1, "next": 3, "pages_returned": 2},
+    }
+    route = _mock_serp(body)
+    out = client.serp("coffee machines", location="Austin, TX", pages=2, radius=500)
+    assert out == body
+    assert out["search_parameters"]["location_used"] == "Austin,Texas,United States"
+    params = route.calls.last.request.url.params
+    assert params["location"] == "Austin, TX"
+    assert params["pages"] == "2"
+    assert params["radius"] == "500"
+    assert sorted(params.keys()) == ["api_key", "location", "pages", "q", "radius"]
+
+
+@respx.mock
+def test_serp_sends_location_and_uule_untrimmed(client):
+    route = _mock_serp()
+    client.serp("coffee", location=" Москва ")
+    assert route.calls.last.request.url.params["location"] == " Москва "
+    client.serp("coffee", uule="w+CAIQICIGQXVzdGlu")
+    assert route.calls.last.request.url.params["uule"] == "w+CAIQICIGQXVzdGlu"
+
+
+@pytest.mark.parametrize(
+    ("lat", "lon", "wire_lat", "wire_lon"),
+    [
+        (30.2672, -97.7431, "30.2672", "-97.7431"),
+        (1e-7, -1e-7, "0.0000001", "-0.0000001"),
+        (1e-9, -1e-9, "0", "0"),
+        (48, -122, "48", "-122"),
+        (48.0, 2.0, "48", "2"),
+        (-0.0, 0, "0", "0"),
+        (1.0e-5, 179.12345678, "0.00001", "179.1234568"),
+        (-89.99999999, 0.5, "-90", "0.5"),
+    ],
+)
+@respx.mock
+def test_serp_sends_lat_lon_as_plain_decimals(client, lat, lon, wire_lat, wire_lon):
+    route = _mock_serp()
+    client.serp("coffee", lat=lat, lon=lon)
+    params = route.calls.last.request.url.params
+    assert params["lat"] == wire_lat
+    assert params["lon"] == wire_lon
+
+
+class _Num(enum.IntEnum):
+    TWO = 2
+
+
+class _LoudInt(int):
+    def __str__(self):
+        return "loud"
+
+    __repr__ = __str__
+
+    def __format__(self, spec):
+        return "loud"
+
+
+class _LoudFloat(float):
+    def __str__(self):
+        return "loud"
+
+    __repr__ = __str__
+
+    def __format__(self, spec):
+        return "loud"
+
+
+@respx.mock
+def test_serp_sends_int_subclasses_as_plain_numbers(client):
+    route = _mock_serp()
+    client.serp(
+        "coffee",
+        page=_Num.TWO,
+        pages=_LoudInt(2),
+        radius=_Num.TWO,
+        lat=_LoudInt(48),
+        lon=_LoudFloat(-97.7431),
+    )
+    params = route.calls.last.request.url.params
+    assert params["page"] == "2"
+    assert params["pages"] == "2"
+    assert params["radius"] == "2"
+    assert params["lat"] == "48"
+    assert params["lon"] == "-97.7431"
+    client.serp("coffee", lat=_Num.TWO, lon=_Num.TWO)
+    params = route.calls.last.request.url.params
+    assert params["lat"] == "2"
+    assert params["lon"] == "2"
+
+
+@respx.mock
+def test_serp_locations_sends_int_subclass_limit_as_plain_number(client):
+    route = respx.get(f"{BASE}/serp/locations").mock(
+        return_value=httpx.Response(200, json=[], headers={"content-type": "application/json"})
+    )
+    client.serp_locations("austin", limit=_LoudInt(3))
+    assert route.calls.last.request.url.params["limit"] == "3"
+    client.serp_locations("austin", limit=_Num.TWO)
+    assert route.calls.last.request.url.params["limit"] == "2"
+
+
+@pytest.mark.parametrize("name", ["pages", "radius"])
+@pytest.mark.parametrize("value", [0, -1, 1.5, 2.0, float("nan"), "2", True, False])
+@respx.mock
+def test_serp_rejects_invalid_pages_and_radius(client, name, value):
+    route = respx.get(f"{BASE}/serp")
+    with pytest.raises(ValueError, match=f"{name} must be an int >= 1"):
+        client.serp("coffee machines", **{name: value})
+    assert not route.called
+
+
+@respx.mock
+def test_serp_leaves_pages_and_radius_upper_bounds_to_server(client):
+    route = _mock_serp()
+    client.serp("coffee machines", pages=6, radius=5000)  # server 400s these; not the client's job
+    params = route.calls.last.request.url.params
+    assert params["pages"] == "6"
+    assert params["radius"] == "5000"
+
+
+@pytest.mark.parametrize("name", ["lat", "lon"])
+@pytest.mark.parametrize(
+    "value", [float("nan"), float("inf"), float("-inf"), True, False, "30.2", [30.2]]
+)
+@respx.mock
+def test_serp_rejects_invalid_lat_lon(client, name, value):
+    route = respx.get(f"{BASE}/serp")
+    with pytest.raises(ValueError, match=f"{name} must be a finite number"):
+        client.serp("coffee machines", **{"lat": 30.0, "lon": -97.0, name: value})
+    assert not route.called
+
+
+@respx.mock
+def test_serp_leaves_location_combinations_to_server(client):
+    route = _mock_serp()
+    # location + lat, lat without lon, radius alone: all server-side 400s (not billed).
+    client.serp("coffee", location="Austin, TX", lat=30.2672, radius=10)
+    params = route.calls.last.request.url.params
+    assert params["location"] == "Austin, TX"
+    assert params["lat"] == "30.2672"
+    assert "lon" not in params
+
+
+SERP_LOCATIONS_BODY = [
+    {
+        "id": "1026201",
+        "google_id": 1026201,
+        "google_parent_id": 21176,
+        "name": "Austin",
+        "canonical_name": "Austin,Texas,United States",
+        "country_code": "US",
+        "target_type": "City",
+        "reach": 974447,
+        "gps": [-97.7431, 30.2672],
+    },
+    {
+        "id": "2840",
+        "google_id": 2840,
+        "google_parent_id": None,
+        "name": "United States",
+        "canonical_name": "United States",
+        "country_code": "US",
+        "target_type": "Country",
+        "reach": 300000000,
+        "gps": [-98.5795, 39.8283],
+    },
+]
+
+
+@respx.mock
+def test_serp_locations_passes_params_and_returns_list(client):
+    route = respx.get(f"{BASE}/serp/locations").mock(
+        return_value=httpx.Response(
+            200, json=SERP_LOCATIONS_BODY, headers={"content-type": "application/json"}
+        )
+    )
+    out = client.serp_locations("austin", limit=3)
+    assert out == SERP_LOCATIONS_BODY
+    assert out[0]["id"] == "1026201"
+    assert out[1]["google_parent_id"] is None
+    params = route.calls.last.request.url.params
+    assert params["api_key"] == API_KEY
+    assert params["q"] == "austin"
+    assert params["limit"] == "3"
+
+
+@respx.mock
+def test_serp_locations_omits_unset_params(client):
+    route = respx.get(f"{BASE}/serp/locations").mock(
+        return_value=httpx.Response(200, json=[], headers={"content-type": "application/json"})
+    )
+    assert client.serp_locations() == []
+    assert sorted(route.calls.last.request.url.params.keys()) == ["api_key"]
+    client.serp_locations(q="petersburg")
+    assert route.calls.last.request.url.params["q"] == "petersburg"
+
+
+@pytest.mark.parametrize("limit", [0, -1, 1.5, 3.0, float("nan"), "3", True, False])
+@respx.mock
+def test_serp_locations_rejects_invalid_limit(client, limit):
+    route = respx.get(f"{BASE}/serp/locations")
+    with pytest.raises(ValueError, match="limit must be an int >= 1"):
+        client.serp_locations("austin", limit=limit)
+    assert not route.called
+
+
+@respx.mock
+def test_serp_locations_leaves_limit_maximum_to_server(client):
+    respx.get(f"{BASE}/serp/locations").mock(
+        return_value=httpx.Response(
+            400,
+            json={"message": "Invalid limit parameter: expected a whole number from 1 to 10"},
+            headers={"content-type": "application/json"},
+        )
+    )
+    with pytest.raises(BadRequestError) as exc_info:
+        client.serp_locations("austin", limit=11)
+    assert "Invalid limit" in exc_info.value.message
 
 
 @respx.mock

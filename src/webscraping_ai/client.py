@@ -11,9 +11,10 @@ from ._transport import (
     DEFAULT_TIMEOUT,
     build_data_params,
     build_params,
+    build_serp_locations_params,
+    build_serp_params,
     parse_response,
     raise_for_status,
-    validate_serp_args,
     wrap_transport_error,
 )
 from ._version import __version__
@@ -295,6 +296,12 @@ class Client:
         gl: Optional[str] = None,
         hl: Optional[str] = None,
         page: Optional[int] = None,
+        pages: Optional[int] = None,
+        location: Optional[str] = None,
+        uule: Optional[str] = None,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+        radius: Optional[int] = None,
     ) -> Any:
         """``GET /serp`` — parsed search engine results for a query.
 
@@ -302,16 +309,52 @@ class Client:
         apply. Returns the decoded ``SerpResult`` dict (``search_parameters``,
         ``search_information``, ``organic_results``, ``related_searches``,
         ``pagination``); optional keys are absent when the engine shows none.
-        Priced per search (see https://webscraping.ai/docs#serp); failed
-        searches are not charged.
+        Billed per results page returned (see https://webscraping.ai/docs#serp);
+        failed searches are not charged.
+
+        Every search runs from one fixed location: ``location`` (a name such as
+        ``"Austin,Texas,United States"`` or ``"Austin, TX"``, or an id from
+        :meth:`serp_locations`), ``lat`` + ``lon`` (decimal degrees, optionally
+        with ``radius`` in meters) or ``uule``; otherwise the capital of the
+        ``gl`` country. So repeats and later pages are consistent. ``gl``
+        defaults to the location's country. ``search_parameters`` echoes
+        ``location_requested``/``location_used`` (and ``lat``, ``lon``,
+        ``radius``). Combining ``location``, ``uule`` and ``lat``/``lon``, or an
+        unknown location, gets a 400 from the server (not billed).
+
+        ``pages`` (1-5) fetches that many consecutive pages, starting at
+        ``page``, as one de-duplicated list: ``position`` counts through the
+        combined list, each organic result gets a ``page`` key and
+        ``pagination.pages_returned`` says how many pages came back.
 
         Raises :class:`ValueError` before any request when ``q`` is not a
-        non-blank ``str`` or ``page`` is not an ``int`` >= 1. ``q`` is sent
-        untrimmed. Pages are 1-100; the server rejects a ``page`` above 100
-        with a 400 (not billed).
+        non-blank ``str``, ``page``, ``pages`` or ``radius`` is not an ``int``
+        >= 1, or ``lat``/``lon`` is not a finite number. ``q`` and ``location``
+        are sent untrimmed. Upper bounds (``page`` 100, ``pages`` 5,
+        ``radius`` 1000) are left to the server, which rejects them with a 400
+        (not billed).
         """
-        validate_serp_args(q, page)
-        return self._get("/serp", q=q, engine=engine, gl=gl, hl=hl, page=page)
+        query = build_serp_params(q, engine, gl, hl, page, pages, location, uule, lat, lon, radius)
+        return self._request("/serp", query)
+
+    def serp_locations(self, q: Optional[str] = None, *, limit: Optional[int] = None) -> Any:
+        """``GET /serp/locations`` — look up names for :meth:`serp`'s ``location``.
+
+        Returns a list of ``SerpLocation`` dicts, most populous first: ``id``
+        (a ``str``), ``google_id``, ``google_parent_id`` (may be ``None`` or
+        absent), ``name``, ``canonical_name`` (pass it, or ``id``, as
+        ``location``), ``country_code``, ``target_type`` (e.g. ``"City"``; an
+        open set), ``reach`` and ``gps`` (``[longitude, latitude]``).
+
+        ``q`` is part of an English location name (e.g. ``"austin"``); without
+        it the most populous locations are returned. ``limit`` caps the count
+        (the server allows up to 10). Free; the API key is sent but not needed.
+
+        Raises :class:`ValueError` before any request when ``limit`` is not an
+        ``int`` >= 1.
+        """
+        query = build_serp_locations_params(q, limit)
+        return self._request("/serp/locations", query)
 
     def data(
         self,

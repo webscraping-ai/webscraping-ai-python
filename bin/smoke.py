@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Hand-run smoke test against the live API. Not part of the test suite —
-costs ~47 credits per full sweep: 4 page calls x 1 (js=False, datacenter
-proxy), question + fields 2 x 6, serp 15, data 15, data_unsupported free
-(the server's 400), account free.
+costs ~47 credits per full sweep plus two more SERP pages: 4 page calls x 1
+(js=False, datacenter proxy), question + fields 2 x 6, serp 15, serp_location
+(pages=2, billed per page returned), serp_locations free, data 15,
+data_unsupported free (the server's 400), account free.
 
 Every endpoint runs once through the sync ``Client``; ``account`` also
 runs through ``AsyncClient`` so the async transport is exercised too.
@@ -29,6 +30,7 @@ TARGET = "https://example.com"
 # 1 credit (AI tools 6); the API default js=True would cost several times more.
 PAGE_OPTS: Dict[str, Any] = {"js": False, "proxy": "datacenter"}
 SERP_QUERY = "coffee machines"
+SERP_LOCATION = "Austin, TX"
 DATA_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
@@ -66,6 +68,27 @@ def check_serp(result: Any) -> str:
     check(actual_q == SERP_QUERY, f"serp search_parameters.q was {actual_q!r}")
     first = organic[0].get("title") if isinstance(organic[0], dict) else None
     return f"{len(organic)} organic results, first: {json.dumps(first)}"
+
+
+def check_serp_location(result: Any) -> str:
+    organic: Any = result.get("organic_results") if isinstance(result, dict) else None
+    check(
+        isinstance(organic, list) and len(organic) > 0, "serp_location returned no organic_results"
+    )
+    used = (result.get("search_parameters") or {}).get("location_used")
+    check(isinstance(used, str) and "Austin" in used, f"serp_location location_used was {used!r}")
+    pages_returned = (result.get("pagination") or {}).get("pages_returned")
+    return f"{len(organic)} organic results from {used}, pages_returned: {pages_returned}"
+
+
+def check_serp_locations(result: Any) -> str:
+    check(isinstance(result, list) and len(result) > 0, "serp_locations returned no locations")
+    first = result[0].get("canonical_name") if isinstance(result[0], dict) else None
+    check(
+        isinstance(first, str) and "Austin" in first,
+        f"serp_locations first canonical_name was {first!r}",
+    )
+    return f"{len(result)} locations, first: {json.dumps(first)}"
 
 
 def check_data(result: Any) -> str:
@@ -165,6 +188,16 @@ def main() -> int:
                 ),
             ),
             ("serp", lambda: check_serp(client.serp(SERP_QUERY))),
+            (
+                "serp_location",
+                lambda: check_serp_location(
+                    client.serp(SERP_QUERY, location=SERP_LOCATION, pages=2)
+                ),
+            ),
+            (
+                "serp_locations",
+                lambda: check_serp_locations(client.serp_locations("austin", limit=3)),
+            ),
             ("data", lambda: check_data(client.data(DATA_URL))),
             ("data_unsupported", lambda: check_data_unsupported(client)),
             ("account (async)", lambda: asyncio.run(async_account(api_key))),

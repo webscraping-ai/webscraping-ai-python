@@ -53,6 +53,12 @@ fields = client.fields(
 # Google search results (SERP) for a query
 results = client.serp("coffee machines", gl="us", hl="en", page=1)
 
+# Search from a fixed location, two results pages in one call
+local = client.serp("coffee machines", location="Austin, TX", pages=2)
+
+# Look up names for `location`
+austin = client.serp_locations("austin")[0]["canonical_name"]  # "Austin,Texas,United States"
+
 # Structured data for a page on a supported site (YouTube, TikTok, X, LinkedIn, Instagram, Reddit, ...)
 video = client.data("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 print(video["data"]["title"])
@@ -146,6 +152,7 @@ them too.
 | `client.question(...)`          | `GET /ai/question`  | `str`                         |
 | `client.fields(...)`            | `GET /ai/fields`    | `dict` (wrapped under `result`) |
 | `client.serp(...)`              | `GET /serp`         | `dict` (`SerpResult`)         |
+| `client.serp_locations(...)`    | `GET /serp/locations` | `list` (`SerpLocation`)     |
 | `client.data(...)`              | `GET /data`         | `dict` (`DataResult`)         |
 | `client.account()`              | `GET /account`      | `dict`                        |
 
@@ -159,21 +166,36 @@ parameter reference.
 
 ### SERP
 
-`client.serp(q, *, engine=None, gl=None, hl=None, page=None)` returns parsed
-search engine results for a query. It is query-shaped rather than URL-shaped,
-so none of the page-fetch parameters above apply. Priced per search (see
-[pricing](https://webscraping.ai/docs#serp)); failed searches are not charged. Raises `ValueError` before any request when
-`q` is not a non-blank `str` or `page` is not an `int` >= 1 (the server also
-rejects it with a 400, not billed; checking client-side saves the round trip).
-`q` is sent as given.
+`client.serp(q, *, engine=None, gl=None, hl=None, page=None, pages=None, location=None,
+uule=None, lat=None, lon=None, radius=None)` returns parsed search engine results for a
+query. It is query-shaped rather than URL-shaped, so none of the page-fetch parameters
+above apply. Billed per results page returned (see
+[pricing](https://webscraping.ai/docs#serp)); failed searches are not charged. Raises
+`ValueError` before any request when `q` is not a non-blank `str`, `page`, `pages` or
+`radius` is not an `int` >= 1, or `lat`/`lon` is not a finite number (the server also
+rejects these with a 400, not billed; checking client-side saves the round trip). `q`
+and `location` are sent as given.
 
-| Parameter | Type  | Default    | Description                                   |
-| --------- | ----- | ---------- | --------------------------------------------- |
-| `q`       | `str` | —          | Search query (required)                       |
-| `engine`  | `str` | `"google"` | Search engine; currently only `google`        |
-| `gl`      | `str` | `"us"`     | Two-letter country code for the search        |
-| `hl`      | `str` | `"en"`     | Two-letter language code for the results      |
-| `page`    | `int` | `1`        | Results page number (10 per page); 1–100, server rejects > 100 with a 400 |
+| Parameter  | Type    | Default    | Description                                   |
+| ---------- | ------- | ---------- | --------------------------------------------- |
+| `q`        | `str`   | —          | Search query (required)                       |
+| `engine`   | `str`   | `"google"` | Search engine; currently only `google`        |
+| `gl`       | `str`   | location's country, else `"us"` | Two-letter country code for the search |
+| `hl`       | `str`   | `"en"`     | Two-letter language code for the results      |
+| `page`     | `int`   | `1`        | Results page number (10 per page); 1–100, server rejects > 100 with a 400 |
+| `pages`    | `int`   | `1`        | Consecutive pages to fetch from `page`, 1–5, as one de-duplicated list |
+| `location` | `str`   | —          | Location name (`"Austin,Texas,United States"`, `"Austin, TX"`, `"Москва"`) or an id from `serp_locations` |
+| `uule`     | `str`   | —          | Google-encoded location (`w+CAIQICI…` or `a+…`) |
+| `lat`      | `float` | —          | Latitude in decimal degrees (with `lon`)      |
+| `lon`      | `float` | —          | Longitude in decimal degrees (with `lat`)     |
+| `radius`   | `int`   | —          | Meters around `location` or `lat`/`lon`, 1–1000 |
+
+Every search runs from one fixed location: `location`, `lat` + `lon` or `uule`,
+otherwise the capital of the `gl` country, so repeats and later pages are consistent.
+`gl` defaults to the location's country. Use only one of `location`, `uule` or
+`lat`/`lon`; an unknown location or a bad combination gets a 400 from the server (not
+billed). `lat`/`lon` are sent as plain decimals rounded to 7 places. `pages` fetches
+consecutive pages as one de-duplicated list, billed per page returned.
 
 ```python
 results = client.serp("coffee machines", gl="gb", page=2)
@@ -181,15 +203,44 @@ print(results["search_information"]["organic_results_state"])  # "Results for ex
 for r in results["organic_results"]:
     print(r["position"], r["title"], r["link"])
 print(results["pagination"])  # {"current": 2, "next": 3}
+
+local = client.serp("coffee machines", location="Austin, TX", pages=2)
+print(local["search_parameters"]["location_used"])  # "Austin,Texas,United States"
+for r in local["organic_results"]:
+    print(r["page"], r["position"], r["title"])  # position counts 1..N across both pages
+print(local["pagination"]["pages_returned"])  # 2
 ```
 
-The response dict has `search_parameters` (`engine`, `q`, `gl`, `hl`, `page`),
-`search_information` (`query_displayed`, `organic_results_state`, optional
-`showing_results_for` and `total_results`), `organic_results` (`position` —
-1-based within the page — `title`, `link`, `domain`, `displayed_link`,
-optional `snippet` and `date`), optional `related_searches` (`query`), and
-`pagination` (`current`, optional `next`). Optional keys are absent when the
-engine does not show them, so use `.get()` for those.
+The response dict has `search_parameters` (`engine`, `q`, `gl`, `hl`, `page`, plus
+`pages` when > 1 and `location_requested`, `location_used`, `lat`, `lon`, `radius`
+when relevant), `search_information` (`query_displayed`, `organic_results_state`,
+optional `showing_results_for` and `total_results`), `organic_results` (`position`,
+`title`, `link`, `domain`, `displayed_link`, optional `snippet` and `date`, and `page`
+when `pages` > 1), optional `related_searches` (`query`), and `pagination` (`current`,
+optional `next`, and `pages_returned` when `pages` > 1). `position` is 1-based within
+the page, or counts through the combined list when `pages` > 1. Optional keys are
+absent when the engine does not show them, so use `.get()` for those.
+
+### SERP locations
+
+`client.serp_locations(q=None, *, limit=None)` looks up names for `serp`'s
+`location`. It is free and needs no API key (the client still sends it). Without `q`
+the most populous locations are returned; `limit` caps the count (the server allows
+up to 10). Raises `ValueError` before any request when `limit` is not an `int` >= 1.
+`q` matches English names (e.g. `"petersburg"`); `serp`'s `location` also accepts
+local names for large cities.
+
+```python
+locations = client.serp_locations("austin", limit=3)
+best = locations[0]
+print(best["canonical_name"], best["target_type"], best["gps"])
+# Austin,Texas,United States City [-97.7431, 30.2672]   (gps is [longitude, latitude])
+results = client.serp("coffee machines", location=best["canonical_name"])  # or best["id"]
+```
+
+Each entry has `id` (a `str`), `google_id`, `google_parent_id` (may be `None`),
+`name`, `canonical_name`, `country_code`, `target_type` (e.g. `City`, `State`,
+`Country`; an open set), `reach` (approximate population) and `gps`.
 
 ### Structured data
 
@@ -257,13 +308,15 @@ mypy src/webscraping_ai
 `bin/smoke.py` hits every endpoint once against the live API through the sync `Client`, plus one
 `account` call through `AsyncClient`. It puts `src/` first on `sys.path`, so it always tests the
 working tree (you still need the runtime deps, e.g. from `pip install -e ".[dev]"`). It is not
-part of the pytest suite and costs ~47 credits per run: the four page calls run with `js=False`
-and `proxy="datacenter"` (1 credit each), `question` and `fields` cost 6 each, and the SERP and
-`/data` (YouTube video) calls are 15 each. A second `/data` call on `https://example.com/` must
-come back as the server's free 400, proving there is no client-side site filter. Each case checks
-the result shape, not just that no exception was raised (SERP must return organic results for the
-query sent, `/data` must parse a title, `selected_multiple` must match something, and so on), and
-FAIL lines redact the API key.
+part of the pytest suite. The four page calls run with `js=False` and `proxy="datacenter"` to
+keep the sweep cheap; the two SERP calls (one plain, one with `location="Austin, TX", pages=2`)
+are billed per results page returned, `/data` is one YouTube video, and `serp_locations` and
+`account` are free. A second `/data` call on `https://example.com/` must come back as the
+server's free 400, proving there is no client-side site filter. Each case checks the result
+shape, not just that no exception was raised (SERP must return organic results for the query
+sent, the located SERP must report an Austin `location_used`, `serp_locations("austin")` must
+put Austin first, `/data` must parse a title, `selected_multiple` must match something, and so
+on), and FAIL lines redact the API key.
 
 ```bash
 WEBSCRAPING_AI_API_KEY=... python bin/smoke.py

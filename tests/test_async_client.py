@@ -99,6 +99,89 @@ async def test_async_serp_rejects_invalid_page(page):
 
 
 @respx.mock
+async def test_async_serp_passes_location_pages_and_lat_lon():
+    route = respx.get(f"{BASE}/serp").mock(
+        return_value=httpx.Response(
+            200, json={"organic_results": []}, headers={"content-type": "application/json"}
+        )
+    )
+    async with AsyncClient(api_key=API_KEY) as c:
+        await c.serp("coffee", location="Austin, TX", pages=2)
+        params = route.calls.last.request.url.params
+        assert params["location"] == "Austin, TX"
+        assert params["pages"] == "2"
+        await c.serp("coffee", lat=1e-7, lon=48, radius=500)
+        params = route.calls.last.request.url.params
+        assert params["lat"] == "0.0000001"
+        assert params["lon"] == "48"
+        assert params["radius"] == "500"
+        await c.serp("coffee", lat=-97.7431, lon=1e-9)
+        params = route.calls.last.request.url.params
+        assert params["lat"] == "-97.7431"
+        assert params["lon"] == "0"
+
+
+@pytest.mark.parametrize("name", ["pages", "radius"])
+@pytest.mark.parametrize("value", [0, 1.5, float("nan"), "2", True])
+@respx.mock
+async def test_async_serp_rejects_invalid_pages_and_radius(name, value):
+    route = respx.get(f"{BASE}/serp")
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(ValueError, match=f"{name} must be an int >= 1"):
+            await c.serp("coffee", **{name: value})
+    assert not route.called
+
+
+@pytest.mark.parametrize("name", ["lat", "lon"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf"), True, "30.2"])
+@respx.mock
+async def test_async_serp_rejects_invalid_lat_lon(name, value):
+    route = respx.get(f"{BASE}/serp")
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(ValueError, match=f"{name} must be a finite number"):
+            await c.serp("coffee", **{"lat": 30.0, "lon": -97.0, name: value})
+    assert not route.called
+
+
+@respx.mock
+async def test_async_serp_locations_passes_params_and_returns_list():
+    body = [
+        {
+            "id": "1026201",
+            "google_id": 1026201,
+            "google_parent_id": 21176,
+            "name": "Austin",
+            "canonical_name": "Austin,Texas,United States",
+            "country_code": "US",
+            "target_type": "City",
+            "reach": 974447,
+            "gps": [-97.7431, 30.2672],
+        }
+    ]
+    route = respx.get(f"{BASE}/serp/locations").mock(
+        return_value=httpx.Response(200, json=body, headers={"content-type": "application/json"})
+    )
+    async with AsyncClient(api_key=API_KEY) as c:
+        out = await c.serp_locations("austin", limit=3)
+        assert out == body
+        params = route.calls.last.request.url.params
+        assert params["q"] == "austin"
+        assert params["limit"] == "3"
+        await c.serp_locations()
+        assert sorted(route.calls.last.request.url.params.keys()) == ["api_key"]
+
+
+@pytest.mark.parametrize("limit", [0, -1, 1.5, float("nan"), "3", True])
+@respx.mock
+async def test_async_serp_locations_rejects_invalid_limit(limit):
+    route = respx.get(f"{BASE}/serp/locations")
+    async with AsyncClient(api_key=API_KEY) as c:
+        with pytest.raises(ValueError, match="limit must be an int >= 1"):
+            await c.serp_locations("austin", limit=limit)
+    assert not route.called
+
+
+@respx.mock
 async def test_async_serp_429_raises_rate_limit_error():
     respx.get(f"{BASE}/serp").mock(
         return_value=httpx.Response(

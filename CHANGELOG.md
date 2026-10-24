@@ -1,6 +1,29 @@
 # Changelog
 
-## Unreleased
+## 4.3.0 — 2026-10-24
+### Added
+
+- `serp(...)` (sync and async) takes `pages`, `location`, `uule`, `lat`, `lon` and
+  `radius`. Every search runs from one fixed location (`location`, `lat` + `lon` or
+  `uule`, otherwise the capital of the `gl` country), so repeats and later pages are
+  consistent; `gl` defaults to the location's country. `pages` (1–5) fetches
+  consecutive pages as one de-duplicated list, billed per results page returned (see
+  https://webscraping.ai/docs#serp). `pages` and `radius` must be an `int` >= 1 and
+  `lat`/`lon` a finite number (`bool`, NaN and infinities raise `ValueError` before
+  any request). `lat`/`lon` are sent as plain decimals rounded to 7 places
+  (`1e-7` -> `0.0000001`), never in exponent form, which the API rejects. Location
+  combinations and upper bounds are left to the server's 400 (not billed).
+- `Client.serp_locations(q=None, *, limit=None)` and `AsyncClient.serp_locations(...)`
+  for `GET /serp/locations`: look up location names (e.g. `"austin"`) to pass as
+  `location`. Free; returns a list of dicts with `id`, `canonical_name`,
+  `country_code`, `target_type`, `reach`, `gps` and more. `limit` must be an
+  `int` >= 1.
+- Documented the new `SerpResult` keys: `search_parameters` `pages`,
+  `location_requested`, `location_used`, `lat`, `lon`, `radius`;
+  `organic_results[].page`; `pagination.pages_returned`.
+- `bin/smoke.py` adds a `location="Austin, TX", pages=2` SERP call and a
+  `serp_locations("austin", limit=3)` call, both asserting Austin comes back.
+
 ### Changed
 
 - Docs: stop stating credit prices (they're set server-side and change); link to https://webscraping.ai/docs pricing instead.

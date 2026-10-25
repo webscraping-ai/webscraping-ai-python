@@ -34,16 +34,15 @@
 - `Client.data(url, *, country, transcript, transcript_language, **params)` and
   `AsyncClient.data(...)` for the `GET /data` endpoint — structured JSON for a
   page on a supported site (e.g. YouTube, TikTok, X, LinkedIn, Instagram,
-  Reddit) as a dict with `request_parameters`, `parse_status` and `data`. Flat
-  15 credits per request. The client does not check the URL's site: new sites
+  Reddit) as a dict with `request_parameters`, `parse_status` and `data`.
+  Priced per site (see https://webscraping.ai/docs#data). The client does not check the URL's site: new sites
   are added server-side, and an unsupported URL or page type returns a 400
   that is not charged (`BadRequestError`); its message lists what is supported. Raises `ValueError` before any request when `url` is not a
   non-blank `str`. Extra keyword arguments are sent as-is as query params
   (scalars only; `api_key` raises `ValueError`, a second `url` is a
   `TypeError`).
 - `bin/smoke.py` checks `/data` on a YouTube video and that
-  `https://example.com/` gets the server's 400 "Unsupported URL" error (~47
-  credits per sweep).
+  `https://example.com/` gets the server's 400 "Unsupported URL" error.
 
 ## 4.1.0 — 2026-09-25
 
@@ -51,7 +50,7 @@
 
 - `Client.serp(q, *, engine, gl, hl, page)` and `AsyncClient.serp(...)` for the
   new `GET /serp` endpoint — parsed Google search results (organic results,
-  related searches, pagination) as a dict. Flat 15 credits per search. Raises
+  related searches, pagination) as a dict. Priced per search (see https://webscraping.ai/docs#serp). Raises
   `ValueError` before any request when `q` is not a non-blank `str` (e.g.
   `serp(123)`), or when `page` is not an `int` >= 1 (`bool`, floats, 0 and
   negatives are rejected; the server also rejects them with a 400, not billed,
@@ -59,7 +58,7 @@
   rejects a `page` above 100 with a 400. `q` is sent untrimmed.
 - `bin/smoke.py` live smoke script: asserts result shapes (not just the absence
   of exceptions), catches every exception per case, runs page tools with
-  `js=False` on datacenter proxies (~32 credits per sweep), and redacts the API
+  `js=False` on datacenter proxies to keep the sweep cheap, and redacts the API
   key from its output.
 
 ### Fixed

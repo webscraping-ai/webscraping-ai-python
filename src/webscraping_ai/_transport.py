@@ -208,9 +208,7 @@ def build_data_params(
 ) -> Dict[str, Any]:
     """Validate ``data`` arguments and return its query params (``api_key`` not included).
 
-    Deliberately no site check: supported sites are added server-side, and an
-    unsupported URL or page type gets a free 400 (:class:`BadRequestError`) whose
-    message lists what is supported. The
+    Deliberately no site check: ``/data`` accepts any public web page, so the
     only client-side check is that ``url`` is a non-blank ``str`` (sent untrimmed).
 
     ``extra`` holds provider-specific query params sent as-is (scalars only);

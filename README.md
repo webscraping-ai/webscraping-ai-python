@@ -59,9 +59,9 @@ local = client.serp("coffee machines", location="Austin, TX", pages=2)
 # Look up names for `location`
 austin = client.serp_locations("austin")[0]["canonical_name"]  # "Austin,Texas,United States"
 
-# Structured data for a page on a supported site (YouTube, TikTok, X, LinkedIn, Instagram, Reddit, ...)
-video = client.data("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-print(video["data"]["title"])
+# Structured data for any public web page
+page = client.data("https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html")
+print(page["data"]["title"])
 
 # Account quota
 info = client.account()
@@ -245,43 +245,75 @@ Each entry has `id` (a `str`), `google_id`, `google_parent_id` (may be `None`),
 ### Structured data
 
 `client.data(url, *, country=None, transcript=None, transcript_language=None, **params)`
-(and `await AsyncClient.data(...)`) returns structured JSON for a public page on a
-supported site. Pass the page's normal URL; the site (`provider`) and page kind
-(`type`) are detected from it. Priced per site (see
-[pricing](https://webscraping.ai/docs#data)), including pages that parse empty
-(`parse_status` `"parse_failed"`) or no longer exist (`"not_found"`);
-unsupported URLs and failed fetches are not charged. None of the page-fetch parameters above apply.
-
-Supported sites today include, for example, YouTube (video/channel/playlist),
-TikTok (video/profile), X/Twitter (tweet/profile), LinkedIn (company/job/profile),
-Instagram (post/reel/profile) and Reddit (post/subreddit/user). **More sites are
-added server-side** and work with this package without an upgrade: the client
-never checks the URL's site. An unsupported URL or page type returns a 400 that
-is not charged (`BadRequestError`). Its message lists what is supported.
+(and `await AsyncClient.data(...)`) returns structured JSON for any public web page.
+Pass the page's normal URL; the site the page belongs to (`provider`, e.g.
+`toscrape.com`) and the kind of page (`type`, e.g. `product`) are detected from it.
+Some popular sites have dedicated parsers with fixed fields; for any other site,
+an AI model learns the structure of each kind of page the first time it is
+requested, and from then on pages of that kind on that site return data straight
+away for every user. See [pricing](https://webscraping.ai/docs#data); pages that
+parse empty (`parse_status` `"parse_failed"`) or no longer exist (`"not_found"`)
+are charged, failed fetches are not. The client never checks the URL's site.
 
 | Parameter             | Type   | Default | Description |
 | --------------------- | ------ | ------- | ----------- |
 | `url`                 | `str`  | —       | Page URL (required). A blank or non-str `url` raises `ValueError`; passing `url` twice (e.g. again in `**params`) raises `TypeError` |
 | `country`             | `str`  | `"us"`  | Two-letter country code of the proxy used to fetch the page, `us` by default |
-| `transcript`          | `bool` | `False` | YouTube videos only. Also fetch the video's transcript into `data.transcript`. It's null when no matching captions are available. If the transcript fetch itself fails, the whole request fails with a 500 and is not charged |
-| `transcript_language` | `str`  | —       | Caption language to pick, e.g. `en` or `de`. Without it, English is preferred, then the first available track. If the video has no captions in that language, `data.transcript` is null |
-| `**params`            | `str`, `int`, `float`, `bool` | — | Extra query params sent as-is, for provider-specific params added later (`None` omits one). `api_key` raises `ValueError` |
+| `transcript`          | `bool` | `False` | Video pages on sites with a dedicated parser only. Also fetch the video's transcript into `data.transcript`. It's null when no matching captions are available. If the transcript fetch itself fails, the whole request fails with a 500 and is not charged |
+| `transcript_language` | `str`  | —       | With `transcript=True`. Caption language to pick, e.g. `en` or `de`. Without it, English is preferred, then the first available track. If the video has no captions in that language, `data.transcript` is null |
+| `**params`            | `str`, `int`, `float`, `bool` | — | Extra query params sent as-is (`None` omits one). For pages without a dedicated parser the API also accepts `timeout`, `js_timeout`, `wait_for` and `device`, which can be passed this way. There are no `js` or `proxy` options: `/data` renders pages with JavaScript where the site needs it and always uses `proxy=auto`. `api_key` raises `ValueError` |
 
 ```python
-result = client.data("https://www.youtube.com/watch?v=dQw4w9WgXcQ", transcript=True)
-result["request_parameters"]  # {"url": "...", "provider": "youtube", "type": "video"}
+result = client.data("https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html")
+result["request_parameters"]  # {"url": "...", "provider": "toscrape.com", "type": "product"}
 result["parse_status"]        # "ok" (or "parse_failed" / "not_found")
-result["data"]                # shape depends on provider and type; may be None
-
-try:
-    client.data("https://example.com/")
-except BadRequestError as e:
-    print(e.message)  # "Unsupported URL for /data. Supported sites: youtube, tiktok, ..."
+result["data"]                # {"title": "A Light in the Attic", "price": 51.77, "currency": "GBP", ...}
 ```
 
 `provider`, `type` and `parse_status` are open sets of strings, and `data` is
 the decoded JSON as-is (no per-site classes), so new sites and fields show up
 without a package release.
+
+**First request for a new kind of page.** The first request for a new kind of
+page also learns its structure, so it can take up to about 45 seconds; keep the
+client timeout (`Client(timeout=...)`, 60 seconds by default) above that. When
+learning takes longer, or another request is already learning that site, the
+API answers `503` with
+`{"message": "...", "error_code": "structure_processing", "retry_after": 30}`
+(plus a `Retry-After` header). It is not charged. There is no dedicated error
+class for 503, so it raises the base `APIError` with `e.status == 503` (the
+`error_code` and `retry_after` are in the raw JSON of `e.response_body`). Wait
+`retry_after` seconds and call again; the retry can return data (if
+learning failed meanwhile, it may learn again or answer the 422 below):
+
+```python
+import json
+import time
+
+from webscraping_ai import APIError
+
+try:
+    result = client.data(url)
+except APIError as e:
+    if e.status != 503:
+        raise
+    time.sleep(json.loads(e.response_body).get("retry_after", 30))
+    result = client.data(url)
+```
+
+**No structured data found (HTTP 422).** When a page has nothing to extract
+(an empty page, a login wall), the API answers `422` with
+`error_code: "structure_unavailable"`, not charged. There is no dedicated error
+class for 422, so it raises the base `APIError` with `e.status == 422` (the
+`error_code` is in the raw JSON of `e.response_body`); use `client.fields(...)`
+for such pages instead.
+
+**Other `/data` errors.** Redirects within the same site (http→https, `www`,
+trailing slash) are followed; a redirect to another site answers `500`
+(`ServerError`) with `error_code: "target_redirect"` (the target is in the
+message), not charged.
+Starting too many new kinds of pages in an hour answers `429` with
+`error_code: "rate_limited"` (`RateLimitError`).
 
 ### API response-shape notes
 
@@ -308,15 +340,17 @@ mypy src/webscraping_ai
 `bin/smoke.py` hits every endpoint once against the live API through the sync `Client`, plus one
 `account` call through `AsyncClient`. It puts `src/` first on `sys.path`, so it always tests the
 working tree (you still need the runtime deps, e.g. from `pip install -e ".[dev]"`). It is not
-part of the pytest suite. The four page calls run with `js=False` and `proxy="datacenter"` to
-keep the sweep cheap; the two SERP calls (one plain, one with `location="Austin, TX", pages=2`)
-are billed per results page returned, `/data` is one YouTube video, and `serp_locations` and
-`account` are free. A second `/data` call on `https://example.com/` must come back as the
-server's free 400, proving there is no client-side site filter. Each case checks the result
-shape, not just that no exception was raised (SERP must return organic results for the query
-sent, the located SERP must report an Austin `location_used`, `serp_locations("austin")` must
-put Austin first, `/data` must parse a title, `selected_multiple` must match something, and so
-on), and FAIL lines redact the API key.
+part of the pytest suite and uses real credits: the four page calls run with `js=False` and
+`proxy="datacenter"` to keep the cost down, the two SERP calls (one plain, one with
+`location="Austin, TX", pages=2`) are billed per results page returned, the `/data` call uses a
+page on a site with a dedicated parser (see [pricing](https://webscraping.ai/docs#data)), and
+`serp_locations` and `account` are free. A second `/data` call on `https://example.com/` (a site
+without a dedicated parser) passes if it returns a success envelope, a 503 `structure_processing`
+error, or a 422 `structure_unavailable` error. Each case checks the result shape, not just that no
+exception was raised (SERP must return organic results for the query sent, the located SERP must
+report an Austin `location_used`, `serp_locations("austin")` must put Austin first, `/data` must
+parse a title, `selected_multiple` must match something, and so on), and FAIL lines redact the API
+key.
 
 ```bash
 WEBSCRAPING_AI_API_KEY=... python bin/smoke.py

@@ -365,37 +365,53 @@ class Client:
         transcript_language: Optional[str] = None,
         **params: Any,
     ) -> Any:
-        """``GET /data`` — structured JSON for a page on a supported site.
+        """``GET /data`` — structured JSON for any public web page.
 
         Returns the decoded ``DataResult`` dict: ``request_parameters``
-        (``url``, ``provider``, ``type``), ``parse_status`` (``"ok"``,
-        ``"parse_failed"`` or ``"not_found"``, all billed) and ``data``, whose
-        shape depends on provider and type and which may be ``None``. Priced
-        per site (see https://webscraping.ai/docs#data); unsupported URLs and
-        failed fetches are not charged. None of the page-fetch options apply.
+        (``url``, ``provider`` — the site the page belongs to, e.g.
+        ``toscrape.com`` — and ``type`` — the kind of page, e.g. ``product``),
+        ``parse_status`` (``"ok"``, ``"parse_failed"`` or ``"not_found"``, all
+        billed) and ``data``, whose shape depends on provider and type and
+        which may be ``None``. ``provider``, ``type`` and ``parse_status`` are
+        open sets of strings. Some popular sites have dedicated parsers with
+        fixed fields; for other sites an AI model learns each kind of page the
+        first time it is requested. See https://webscraping.ai/docs#data for
+        pricing; failed fetches are not charged. The URL's site is never
+        checked here.
 
-        Supported sites (e.g. YouTube, TikTok, X/Twitter, LinkedIn, Instagram,
-        Reddit) are added server-side, so the URL's site is never checked here.
-        An unsupported URL or page type returns a 400 that is not charged
-        (:class:`BadRequestError`); its message lists what is supported.
-        ``provider``, ``type`` and ``parse_status`` are open sets of strings.
+        The first request for a new kind of page also learns its structure,
+        so it can take up to about 45 seconds (keep the client ``timeout``
+        above that). When learning takes longer, or another request is
+        already learning that site, the API answers HTTP 503 with
+        ``error_code`` ``"structure_processing"`` and ``retry_after``
+        (seconds), not charged; it is raised as :class:`APIError` with
+        ``status == 503`` (the ``error_code`` and ``retry_after`` are in the
+        JSON of ``response_body``): call again after ``retry_after`` seconds,
+        which can return data.
+        A page with no structured data (empty page, login wall) gets an HTTP
+        422 with ``error_code`` ``"structure_unavailable"`` (not charged),
+        raised as :class:`APIError` with ``status == 422``; use :meth:`fields`
+        for such pages.
 
         ``country``: two-letter country code of the proxy used to fetch the
         page, ``us`` by default.
 
-        ``transcript``: YouTube videos only. Also fetch the video's transcript
-        into ``data.transcript``. It's null when no matching captions are
-        available. If the transcript fetch itself fails, the whole request
+        ``transcript``: video pages on sites with a dedicated parser only. Also
+        fetch the video's transcript into ``data.transcript``. It's null when
+        no matching captions are available. If the transcript fetch itself fails, the whole request
         fails with a 500 and is not charged.
 
-        ``transcript_language``: caption language to pick, e.g. ``en`` or
-        ``de``. Without it, English is preferred, then the first available
+        ``transcript_language``: with ``transcript=True``, caption language to
+        pick, e.g. ``en`` or ``de``. Without it, English is preferred, then the first available
         track. If the video has no captions in that language,
         ``data.transcript`` is null.
 
-        Any other keyword arguments are sent as-is as extra query params (for
-        provider-specific params added later); they must be scalars. ``api_key``
-        raises :class:`ValueError`; a second ``url`` is a :class:`TypeError`
+        Any other keyword arguments are sent as-is as extra query params; they
+        must be scalars. For pages without a dedicated parser the API also
+        accepts ``timeout``, ``js_timeout``, ``wait_for`` and ``device``.
+        There are no ``js`` or ``proxy`` options: ``/data`` renders pages with
+        JavaScript where the site needs it and always uses ``proxy=auto``.
+        ``api_key`` raises :class:`ValueError`; a second ``url`` is a :class:`TypeError`
         (Python's duplicate-argument error), so neither can be overridden.
 
         Raises :class:`ValueError` before any request when ``url`` is not a

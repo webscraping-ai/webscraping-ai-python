@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Hand-run smoke test against the live API. Not part of the test suite —
-costs ~47 credits per full sweep plus two more SERP pages: 4 page calls x 1
-(js=False, datacenter proxy), question + fields 2 x 6, serp 15, serp_location
-(pages=2, billed per page returned), serp_locations free, data 15,
-data_unsupported free (the server's 400), account free.
+uses real credits: page calls run with js=False on the datacenter proxy
+to keep the cost down; the located SERP call is billed per results page
+returned; data_any_site is not charged when it answers 503, 422 or a 500
+timeout; serp_locations and account are free. See https://webscraping.ai/docs for
+pricing.
 
 Every endpoint runs once through the sync ``Client``; ``account`` also
 runs through ``AsyncClient`` so the async transport is exercised too.
@@ -23,11 +24,11 @@ from typing import Any, Callable, Dict, List, Tuple
 # Load the package from the working tree, not a site-packages install.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from webscraping_ai import AsyncClient, BadRequestError, Client
+from webscraping_ai import APIError, AsyncClient, Client
 
 TARGET = "https://example.com"
 # Page tools run without JS on datacenter proxies so each call costs the documented
-# 1 credit (AI tools 6); the API default js=True would cost several times more.
+# minimum; the API default js=True would cost several times more.
 PAGE_OPTS: Dict[str, Any] = {"js": False, "proxy": "datacenter"}
 SERP_QUERY = "coffee machines"
 SERP_LOCATION = "Austin, TX"
@@ -104,15 +105,34 @@ def check_data(result: Any) -> str:
     return f"{provider}/{request_parameters.get('type')} {status}, title: {json.dumps(title)}"
 
 
-def check_data_unsupported(client: Client) -> str:
-    # No client-side site filter: the URL must reach the server and get its free 400.
+def check_data_any_site(client: Client) -> str:
+    # /data works on any public page. Accept a success envelope, a 503 when
+    # learning the structure outlasts the request, a 422 when the page has no
+    # structured data (both raised as a plain APIError), or a 500 timeout when
+    # extracting the data or loading the page runs out of time (a ServerError).
     try:
-        client.data("https://example.com/")
-    except BadRequestError as e:
-        check(e.status == 400, f"data_unsupported status was {e.status}")
-        check("Unsupported URL" in e.message, f"data_unsupported message was {e.message!r}")
-        return f"server 400: {e.message}"
-    raise SmokeCheckFailed("data on https://example.com/ unexpectedly succeeded")
+        result = client.data("https://example.com/")
+    except APIError as e:
+        error_code = _error_code(e.response_body)
+        expected = {503: "structure_processing", 422: "structure_unavailable", 500: "timeout"}
+        check(e.status in expected, f"data_any_site status was {e.status}: {e.message}")
+        check(
+            error_code == expected[e.status],
+            f"data_any_site {e.status} error_code was {error_code!r}",
+        )
+        return f"{e.status} {error_code}: {e.message}"
+    check(isinstance(result, dict), f"data_any_site returned {type(result).__name__}")
+    params = result.get("request_parameters")
+    check(isinstance(params, dict), f"data_any_site returned no envelope: {result!r}")
+    return f"{params.get('provider')}/{params.get('type')} {result.get('parse_status')}"
+
+
+def _error_code(response_body: Any) -> Any:
+    try:
+        parsed = json.loads(response_body or "")
+    except ValueError:
+        return None
+    return parsed.get("error_code") if isinstance(parsed, dict) else None
 
 
 def preview(result: Any) -> str:
@@ -199,7 +219,7 @@ def main() -> int:
                 lambda: check_serp_locations(client.serp_locations("austin", limit=3)),
             ),
             ("data", lambda: check_data(client.data(DATA_URL))),
-            ("data_unsupported", lambda: check_data_unsupported(client)),
+            ("data_any_site", lambda: check_data_any_site(client)),
             ("account (async)", lambda: asyncio.run(async_account(api_key))),
         ]
         failures = sum(not report(name, call, api_key) for name, call in cases)

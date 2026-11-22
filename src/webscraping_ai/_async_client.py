@@ -266,9 +266,9 @@ class AsyncClient:
     ) -> Any:
         """``GET /ai/fields`` — structured fields extracted from a page.
 
-        The live API currently wraps the result under a ``result`` key; this
-        client returns the raw response, so callers should expect
-        ``{"result": {"title": ..., ...}}``.
+        The API wraps the extracted fields under a ``result`` key and every
+        value is a string or ``None``; this client returns the raw response,
+        so callers get ``{"result": {"title": ..., ...}}``.
         """
         return await self._get(
             "/ai/fields",
@@ -392,9 +392,15 @@ class AsyncClient:
         422 with ``error_code`` ``"structure_unavailable"`` (not charged),
         raised as :class:`APIError` with ``status == 422``; use :meth:`fields`
         for such pages.
+        If loading the page or extracting the data runs out of time, or the AI
+        model is busy, the API answers HTTP 500 with ``error_code``
+        ``"timeout"`` or ``"ai_unavailable"`` (not charged), raised as
+        :class:`ServerError`; call again.
 
         ``country``: two-letter country code of the proxy used to fetch the
-        page, ``us`` by default.
+        page. Without it, pages on a country site with a dedicated parser
+        (e.g. ``uk.indeed.com``) use that site's country and everything else
+        uses ``us``. Some dedicated parsers use a fixed route and ignore it.
 
         ``transcript``: video pages on sites with a dedicated parser only. Also
         fetch the video's transcript into ``data.transcript``. It's null when

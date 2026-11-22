@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+### Changed
+
+- Docs: `data(country=...)` has no fixed `us` default. Without it, pages on a
+  country site with a dedicated parser (e.g. `uk.indeed.com`) use that site's
+  country and everything else uses `us`; some dedicated parsers ignore it.
+- Docs: the `/data` example now shows the live output (`type` `"book"`,
+  `currency` `"£"`), and the `/data` error notes cover the retryable 500
+  `timeout` and `ai_unavailable` (not charged).
+- Docs: the `/ai/fields` `result` wrapper is documented in the API spec now, so
+  it is no longer described as a divergence; every value is a string or `None`.
+- Docs: mention `proxy="auto"` alongside the datacenter/residential/stealth tiers.
+- `bin/smoke.py`: the `/data` any-site check also accepts a 500 `ai_unavailable`.
+
 ## 4.3.0 — 2026-10-24
 ### Added
 

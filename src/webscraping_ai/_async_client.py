@@ -398,9 +398,9 @@ class AsyncClient:
         :class:`ServerError`; call again.
 
         ``country``: two-letter country code of the proxy used to fetch the
-        page. Without it, pages on a country site with a dedicated parser
-        (e.g. ``uk.indeed.com``) use that site's country and everything else
-        uses ``us``. Some dedicated parsers use a fixed route and ignore it.
+        page. Without it, Indeed country sites (e.g. ``uk.indeed.com``) use
+        that site's country and everything else uses ``us``. Some dedicated
+        parsers use a fixed route and ignore it.
 
         ``transcript``: video pages on sites with a dedicated parser only. Also
         fetch the video's transcript into ``data.transcript``. It's null when

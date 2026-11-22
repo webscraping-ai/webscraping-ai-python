@@ -3,9 +3,9 @@
 ## Unreleased
 ### Changed
 
-- Docs: `data(country=...)` has no fixed `us` default. Without it, pages on a
-  country site with a dedicated parser (e.g. `uk.indeed.com`) use that site's
-  country and everything else uses `us`; some dedicated parsers ignore it.
+- Docs: `data(country=...)` has no fixed `us` default. Without it, Indeed
+  country sites (e.g. `uk.indeed.com`) use that site's country and everything
+  else uses `us`; some dedicated parsers ignore it.
 - Docs: the `/data` example now shows the live output (`type` `"book"`,
   `currency` `"£"`), and the `/data` error notes cover the retryable 500
   `timeout` and `ai_unavailable` (not charged).

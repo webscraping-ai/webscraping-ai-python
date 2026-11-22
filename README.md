@@ -248,7 +248,7 @@ Each entry has `id` (a `str`), `google_id`, `google_parent_id` (may be `None`),
 `client.data(url, *, country=None, transcript=None, transcript_language=None, **params)`
 (and `await AsyncClient.data(...)`) returns structured JSON for any public web page.
 Pass the page's normal URL; the site the page belongs to (`provider`, e.g.
-`toscrape.com`) and the kind of page (`type`, e.g. `product`) are detected from it.
+`toscrape.com`) and the kind of page (`type`, e.g. `book`) are detected from it.
 Some popular sites have dedicated parsers with fixed fields; for any other site,
 an AI model learns the structure of each kind of page the first time it is
 requested, and from then on pages of that kind on that site return data straight

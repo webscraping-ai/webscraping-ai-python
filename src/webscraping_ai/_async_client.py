@@ -369,7 +369,7 @@ class AsyncClient:
 
         Returns the decoded ``DataResult`` dict: ``request_parameters``
         (``url``, ``provider`` — the site the page belongs to, e.g.
-        ``toscrape.com`` — and ``type`` — the kind of page, e.g. ``product``),
+        ``toscrape.com`` — and ``type`` — the kind of page, e.g. ``book``),
         ``parse_status`` (``"ok"``, ``"parse_failed"`` or ``"not_found"``, all
         billed) and ``data``, whose shape depends on provider and type and
         which may be ``None``. ``provider``, ``type`` and ``parse_status`` are

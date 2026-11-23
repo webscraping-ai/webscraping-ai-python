@@ -266,9 +266,9 @@ class Client:
     ) -> Any:
         """``GET /ai/fields`` — structured fields extracted from a page.
 
-        The live API currently wraps the result under a ``result`` key; this
-        client returns the raw response, so callers should expect
-        ``{"result": {"title": ..., ...}}``.
+        The API wraps the extracted fields under a ``result`` key and every
+        value is a string or ``None``; this client returns the raw response,
+        so callers get ``{"result": {"title": ..., ...}}``.
         """
         return self._get(
             "/ai/fields",
@@ -369,7 +369,7 @@ class Client:
 
         Returns the decoded ``DataResult`` dict: ``request_parameters``
         (``url``, ``provider`` — the site the page belongs to, e.g.
-        ``toscrape.com`` — and ``type`` — the kind of page, e.g. ``product``),
+        ``toscrape.com`` — and ``type`` — the kind of page, e.g. ``book``),
         ``parse_status`` (``"ok"``, ``"parse_failed"`` or ``"not_found"``, all
         billed) and ``data``, whose shape depends on provider and type and
         which may be ``None``. ``provider``, ``type`` and ``parse_status`` are
@@ -392,9 +392,15 @@ class Client:
         422 with ``error_code`` ``"structure_unavailable"`` (not charged),
         raised as :class:`APIError` with ``status == 422``; use :meth:`fields`
         for such pages.
+        If loading the page or extracting the data runs out of time, or the AI
+        model is busy, the API answers HTTP 500 with ``error_code``
+        ``"timeout"`` or ``"ai_unavailable"`` (not charged), raised as
+        :class:`ServerError`; call again.
 
         ``country``: two-letter country code of the proxy used to fetch the
-        page, ``us`` by default.
+        page. Without it, Indeed country sites (e.g. ``uk.indeed.com``) use
+        that site's country and everything else uses ``us``. Some dedicated
+        parsers use a fixed route and ignore it.
 
         ``transcript``: video pages on sites with a dedicated parser only. Also
         fetch the video's transcript into ``data.transcript``. It's null when

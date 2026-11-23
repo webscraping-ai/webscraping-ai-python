@@ -5,7 +5,8 @@
 
 Official Python client for the [WebScraping.AI](https://webscraping.ai) API —
 web scraping with Chromium JavaScript rendering, rotating
-datacenter/residential/stealth proxies, and AI-powered question answering and
+datacenter/residential/stealth proxies (or `proxy="auto"` to try them in that
+order), and AI-powered question answering and
 structured field extraction on any page. Sync and async clients included. See
 the [API documentation](https://webscraping.ai/docs) for the full parameter
 reference.
@@ -247,7 +248,7 @@ Each entry has `id` (a `str`), `google_id`, `google_parent_id` (may be `None`),
 `client.data(url, *, country=None, transcript=None, transcript_language=None, **params)`
 (and `await AsyncClient.data(...)`) returns structured JSON for any public web page.
 Pass the page's normal URL; the site the page belongs to (`provider`, e.g.
-`toscrape.com`) and the kind of page (`type`, e.g. `product`) are detected from it.
+`toscrape.com`) and the kind of page (`type`, e.g. `book`) are detected from it.
 Some popular sites have dedicated parsers with fixed fields; for any other site,
 an AI model learns the structure of each kind of page the first time it is
 requested, and from then on pages of that kind on that site return data straight
@@ -258,16 +259,16 @@ are charged, failed fetches are not. The client never checks the URL's site.
 | Parameter             | Type   | Default | Description |
 | --------------------- | ------ | ------- | ----------- |
 | `url`                 | `str`  | —       | Page URL (required). A blank or non-str `url` raises `ValueError`; passing `url` twice (e.g. again in `**params`) raises `TypeError` |
-| `country`             | `str`  | `"us"`  | Two-letter country code of the proxy used to fetch the page, `us` by default |
+| `country`             | `str`  | —       | Two-letter country code of the proxy used to fetch the page. Without it, Indeed country sites (e.g. `uk.indeed.com`) use that site's country and everything else uses `us`. Some dedicated parsers use a fixed route and ignore it |
 | `transcript`          | `bool` | `False` | Video pages on sites with a dedicated parser only. Also fetch the video's transcript into `data.transcript`. It's null when no matching captions are available. If the transcript fetch itself fails, the whole request fails with a 500 and is not charged |
 | `transcript_language` | `str`  | —       | With `transcript=True`. Caption language to pick, e.g. `en` or `de`. Without it, English is preferred, then the first available track. If the video has no captions in that language, `data.transcript` is null |
 | `**params`            | `str`, `int`, `float`, `bool` | — | Extra query params sent as-is (`None` omits one). For pages without a dedicated parser the API also accepts `timeout`, `js_timeout`, `wait_for` and `device`, which can be passed this way. There are no `js` or `proxy` options: `/data` renders pages with JavaScript where the site needs it and always uses `proxy=auto`. `api_key` raises `ValueError` |
 
 ```python
 result = client.data("https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html")
-result["request_parameters"]  # {"url": "...", "provider": "toscrape.com", "type": "product"}
+result["request_parameters"]  # {"url": "...", "provider": "toscrape.com", "type": "book"}
 result["parse_status"]        # "ok" (or "parse_failed" / "not_found")
-result["data"]                # {"title": "A Light in the Attic", "price": 51.77, "currency": "GBP", ...}
+result["data"]                # {"title": "A Light in the Attic", "price": 51.77, "currency": "£", ...}
 ```
 
 `provider`, `type` and `parse_status` are open sets of strings, and `data` is
@@ -314,14 +315,16 @@ trailing slash) are followed; a redirect to another site answers `500`
 message), not charged.
 Starting too many new kinds of pages in an hour answers `429` with
 `error_code: "rate_limited"` (`RateLimitError`).
+If loading the page or extracting the data runs out of time, it answers `500`
+(`ServerError`) with `error_code: "timeout"`; if the AI model is busy, `500`
+with `error_code: "ai_unavailable"`. Neither is charged; call again.
 
 ### API response-shape notes
 
-Two endpoints return shapes that differ from the OpenAPI spec examples. The
-client returns the raw response unchanged, so:
+The client returns the raw response unchanged, so:
 
-- `/ai/fields` wraps the extracted fields under a `result` key:
-  `{"result": {"title": "...", "price": "..."}}`.
+- `/ai/fields` wraps the extracted fields under a `result` key, and every value
+  is a string or `None`: `{"result": {"title": "...", "price": "..."}}`.
 - `/selected-multiple` returns `list[list[str]]`, not a flat `list[str]`.
 
 ## Development
@@ -346,7 +349,7 @@ part of the pytest suite and uses real credits: the four page calls run with `js
 page on a site with a dedicated parser (see [pricing](https://webscraping.ai/docs#data)), and
 `serp_locations` and `account` are free. A second `/data` call on `https://example.com/` (a site
 without a dedicated parser) passes if it returns a success envelope, a 503 `structure_processing`
-error, or a 422 `structure_unavailable` error. Each case checks the result shape, not just that no
+error, a 422 `structure_unavailable` error, or a 500 `timeout` or `ai_unavailable` error. Each case checks the result shape, not just that no
 exception was raised (SERP must return organic results for the query sent, the located SERP must
 report an Austin `location_used`, `serp_locations("austin")` must put Austin first, `/data` must
 parse a title, `selected_multiple` must match something, and so on), and FAIL lines redact the API

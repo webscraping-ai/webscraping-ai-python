@@ -3,8 +3,8 @@
 uses real credits: page calls run with js=False on the datacenter proxy
 to keep the cost down; the located SERP call is billed per results page
 returned; data_any_site is not charged when it answers 503, 422 or a 500
-timeout; serp_locations and account are free. See https://webscraping.ai/docs for
-pricing.
+timeout or ai_unavailable; serp_locations and account are free. See
+https://webscraping.ai/docs for pricing.
 
 Every endpoint runs once through the sync ``Client``; ``account`` also
 runs through ``AsyncClient`` so the async transport is exercised too.
@@ -109,15 +109,20 @@ def check_data_any_site(client: Client) -> str:
     # /data works on any public page. Accept a success envelope, a 503 when
     # learning the structure outlasts the request, a 422 when the page has no
     # structured data (both raised as a plain APIError), or a 500 timeout when
-    # extracting the data or loading the page runs out of time (a ServerError).
+    # extracting the data or loading the page runs out of time, or a 500
+    # ai_unavailable when the AI model is busy (both a ServerError).
     try:
         result = client.data("https://example.com/")
     except APIError as e:
         error_code = _error_code(e.response_body)
-        expected = {503: "structure_processing", 422: "structure_unavailable", 500: "timeout"}
+        expected = {
+            503: {"structure_processing"},
+            422: {"structure_unavailable"},
+            500: {"timeout", "ai_unavailable"},
+        }
         check(e.status in expected, f"data_any_site status was {e.status}: {e.message}")
         check(
-            error_code == expected[e.status],
+            error_code in expected[e.status],
             f"data_any_site {e.status} error_code was {error_code!r}",
         )
         return f"{e.status} {error_code}: {e.message}"
